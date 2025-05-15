@@ -2,7 +2,7 @@
 
 Precise AI translation method with noun comparison list.
 
-中文|[English](./README_en.md)
+中文 | [English](./README_en.md)
 
 ## 程序结构
 
