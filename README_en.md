@@ -26,7 +26,7 @@ Since it is naturally impossible for a noun list to include new nouns in a new t
 
 The most rigorous method of this program is to input the original text file in md format and the noun table file in csv format, and output the translated text file in md format.
 
-Thanks to Markitdown, it can now handle other file formats, but it has not been fully tested. PDF files work well (non-OCR), OCR PDF files still need to be tested.
+Thanks to [Markitdown](https://github.com/microsoft/markitdown), it can now handle other file formats, but it has not been fully tested. PDF files work well (non-OCR), OCR PDF files still need to be tested.
 
 ## Characteristic
 
