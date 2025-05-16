@@ -48,20 +48,36 @@ project_root/
 Python:3.10-3.12
 ```
 
-## 使用教程
+## 命令行实现的使用教程
 
-接下来讲解程序的使用教程：
+这是使用命令行指令执行程序的使用教程：
 
-1. 运行`\src`文件夹中的`main.py`。
-2. 选择使用的API供应商。（目前只支持kimi，gpt，deepseek）
-3. 输入需要翻译的文件路径。（根据Markitdown文档的支持格式：PDF，PowerPoint，Word，Excel，HTML，基于文本的格式（CSV，JSON，XML），EPubs）
-4. 输入csv格式的名词表文件路径。
-5. 等待程序完成翻译并保存为md文档。
+1. 下载`\src`与`\data`文件夹。
+2. 修改`\data\.env`中的环境变量，将自己的API KEY复制粘贴进去并保存。
+3. 运行`\src`文件夹中的`main.py`。
+4. 选择使用的API供应商。（目前只支持kimi，gpt，deepseek）
+5. 输入需要翻译的文件路径。（根据Markitdown文档的支持格式：PDF，PowerPoint，Word，Excel，HTML，基于文本的格式（CSV，JSON，XML），EPubs）
+6. 输入csv格式的名词表文件路径。
+7. 等待程序完成翻译并保存为md文档。
 
 注意事项：
 
 - 要想正常运行程序，你必须在`\data`文件夹中修改环境变量。将`API_KEY`更换为你自己的。
 - 开发过程中使用的供应商是kimi，由于没有openai与deepseek的api余额，故后二者的api访问代码未经过测试。
+
+## webui实现的使用教程
+
+这是使用webui执行程序的使用教程：
+
+1.下载`\webui_project`文件夹。
+2. 修改`\webui_project\data\.env`中的环境变量，将自己的API KEY复制粘贴进去并保存。
+3. 运行`\webui_project`文件夹中的`app.py`。
+4. 打开终端返回的链接，或者直接在浏览器中输入`http://localhost:8001/`。
+5. 在界面中依次点击“选择文件”与“验证文件/词典”，等待成功提示后点击“开始处理文本”即可等待结果文件的下载链接生成。
+![0ddb9cba7b38545db9a37741c2297a04](https://github.com/user-attachments/assets/9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1)
+界面截图
+![7c13ee8301662254329064ced1564e09](https://github.com/user-attachments/assets/bd3912df-b293-4d40-8745-9d41a39246d0)
+下载页面：在右键菜单中选择“另存为”即可。
 
 ## 名词表格式
 
