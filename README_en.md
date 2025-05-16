@@ -46,15 +46,36 @@ P.S. For readers who use non-Chinese languages: This project can theoretically a
 Python:3.10-3.12
 ```
 
-## Tutorial
+## Tutorial for using the command-line implementation
 
-Next, we will explain the usage tutorial of the program:
+Here's a tutorial for executing a program using command-line instructions:
 
-1.  Run `main.py` in the `\src` folder.
-2.  Select the API provider to use. (Currently only kimi, gpt, deepseek are supported)
-3.  Enter the path to the file that needs to be translated. (Supported formats for Markitdown documents: PDF, PowerPoint, Word, Excel, HTML, text-based formats (CSV, JSON, XML), EPubs)
-4.  Enter the path to the noun table file in csv format.
-5.  Wait for the program to complete the translation and save it as an md document.
+1. Download the `\src` and `\data` folders.
+2. Modify the environment variable in `\data\.env`, copy and paste your API KEY into it, and save it.
+3. Run `main.py` in the `\src` folder.
+4. Choose the API vendor you want to use. (Currently only kimi, gpt, deepseek are supported)
+5. Enter the path of the file to be translated. (Supported formats according to Markitdown documents: PDF, PowerPoint, Word, Excel, HTML, text-based formats (CSV, JSON, XML), EPubs)
+6. Enter the path to the glossary file in CSV format.
+7. Wait for the program to finish translating and save as an Markdown document.
+
+Notes:
+
+- In order to run the program properly, you must modify the environment variables in the `\data` folder. Replace 'API_KEY' with your own.
+- The vendor used in the development process is Kimi, and the API access code of OpenAI and Deepseek has not been tested because there is no API balance for the latter.
+
+## Tutorial on how to use the WebUI implementation
+
+Here is the tutorial for using the WebUI executor:
+
+1. Download the `\webui_project` folder.
+2. Modify the environment variable in `\webui_project\data\.env`, copy and paste your API KEY into it and save it.
+3. Run `app.py` in the `\webui_project folder`.
+4. Open the link returned by the terminal or type `http://localhost:8001/` directly into your browser.
+5. Click "选择文件" and "验证文件/验证词典" in the interface, wait for the successful prompt, and then click "开始处理文本" to wait for the download link of the result file to be generated.
+! [0ddb9cba7b38545db9a37741c2297a04] (https://github.com/user-attachments/assets/9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1)
+Screenshot of the interface
+! [7c13ee8301662254329064ced1564e09] (https://github.com/user-attachments/assets/bd3912df-b293-4d40-8745-9d41a39246d0)
+Download page: Select "Save As" from the right-click menu.
 
 Note:
 
