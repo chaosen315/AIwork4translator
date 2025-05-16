@@ -26,7 +26,7 @@ Since it is naturally impossible for a noun list to include new nouns in a new t
 
 The most rigorous method of this program is to input the original text file in md format and the noun table file in csv format, and output the translated text file in md format.
 
-Thanks to [Markitdown](https://github.com/microsoft/markitdown), it can now handle other file formats, but it has not been fully tested. PDF files work well (non-OCR), OCR PDF files still need to be tested.
+Thanks to [markitdown](https://github.com/microsoft/markitdown), it can now handle other file formats, but it has not been fully tested. PDF files work well (non-OCR), OCR PDF files still need to be tested.
 
 ## Characteristic
 
@@ -74,7 +74,7 @@ After providing the glossary, the program sets up a strict review step to ensure
 
 ## Advanced Use
 
-Since the md files converted by Workitdown do not have a title structure, all non-md files that need to be translated are translated through the path of "unstructured translation mode". It does not recognize the title structure of the md document.
+Since the md files converted by morkitdown do not have a title structure, all non-md files that need to be translated are translated through the path of "unstructured translation mode". It does not recognize the title structure of the md document.
 
 When using md files for translation, the program processes the text in "Structured Translation Mode" by default. If the text structure does not meet the following requirements, an error may occur:
 
