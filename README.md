@@ -38,6 +38,10 @@ project_root/
 
 在此基础上，翻译者可以快速更新迭代名词表，也可以减少名词统一的重复工作量
 
+## 效果演示
+
+![Frame 27](https://github.com/user-attachments/assets/b22bfb0e-d7a9-40f7-8f69-b02b524b5b08)
+
 ## 支持环境
 
 ```python
