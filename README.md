@@ -12,7 +12,6 @@ project_root/
 │   ├── .env
 ├── src/
 │   ├── main.py
-│   ├── test_api_tool.py
 │   └── modules/
 │       ├── __init__.py
 │       ├── api_tool.py
