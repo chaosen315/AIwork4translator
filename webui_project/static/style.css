@@ -1,0 +1,180 @@
+/* style.css */
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2c3e50;
+    --success-color: #2ecc71;
+    --background-color: #f8f9fa;
+    --card-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+body {
+    background-color: var(--background-color);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.container {
+    max-width: 800px;
+    padding: 2rem;
+}
+
+h1 {
+    color: var(--secondary-color);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    position: relative;
+    padding-bottom: 1rem;
+}
+
+h1::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 4px;
+    background: var(--primary-color);
+    border-radius: 2px;
+}
+
+.card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+h5 {
+    color: var(--secondary-color);
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.input-group {
+    margin-bottom: 1.5rem;
+    box-shadow: var(--card-shadow);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.form-control {
+    border: 2px solid var(--primary-color);
+    padding: 0.75rem 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--secondary-color);
+    box-shadow: none;
+}
+
+.btn {
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-radius: 50px;
+    padding: 0.75rem 2rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), #2980b9);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color), #27ae60);
+    border: none;
+}
+
+#processBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.progress {
+    height: 1.5rem;
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
+}
+
+.progress-bar {
+    background: linear-gradient(135deg, var(--primary-color), #2980b9);
+    transition: width 0.5s ease;
+}
+
+.alert {
+    border-radius: 0.75rem;
+    box-shadow: var(--card-shadow);
+    border: none;
+}
+
+#downloadLink {
+    color: var(--success-color);
+    font-weight: bold;
+    text-decoration: none;
+    margin-left: 0.5rem;
+}
+
+#downloadLink:hover {
+    text-decoration: underline;
+}
+
+.form-select {
+    border: 2px solid var(--primary-color);
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+}
+
+.file-status {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .input-group button {
+        margin-top: 0.5rem;
+        width: 100%;
+    }
+}
+.progress {
+    height: 25px;
+}
+
+.card {
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.btn-primary {
+    width: 100%;
+}
