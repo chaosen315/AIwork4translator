@@ -36,6 +36,10 @@ On this basis, translators can quickly update and iterate the noun table, and al
 
 P.S. For readers who use non-Chinese languages: This project can theoretically also be applied to the translation of Chinese into foreign languages, but it is necessary to manually modify the prompts in `\modules\api_tool.py`.
 
+## Effect Display
+
+![Frame 27](https://github.com/user-attachments/assets/b22bfb0e-d7a9-40f7-8f69-b02b524b5b08)
+
 ## Supportive Environment
 
 ```python
