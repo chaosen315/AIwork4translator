@@ -37,7 +37,7 @@ def write_to_markdown(
             _write_structured_section(file, paragraph_text, metadata)
         else:
             # 兼容模式写入
-            file.write(f"\\n{paragraph_text}\\n# end")
+            file.write(f"\n{paragraph_text}\n# end")
 
 def _parse_content(content, mode) -> Tuple[str, dict]:
     """统一解析输入内容"""
