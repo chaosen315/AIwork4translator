@@ -53,7 +53,7 @@ Here's a tutorial for executing a program using command-line instructions:
 1. Download the `\src` and `\data` folders.
 2. Modify the environment variable in `\data\.env`, copy and paste your API KEY into it, and save it.
 3. Run `main.py` in the `\src` folder.
-4. Choose the API vendor you want to use. (Currently only kimi, gpt, deepseek are supported)
+4. Choose the API vendor you want to use. (Currently only kimi, gpt, deepseek, ollama are supported)
 5. Enter the path of the file to be translated. (Supported formats according to Markitdown documents: PDF, PowerPoint, Word, Excel, HTML, text-based formats (CSV, JSON, XML), EPubs)
 6. Enter the path to the glossary file in CSV format.
 7. Wait for the program to finish translating and save as an Markdown document.

@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 # 加载环境变量
-load_dotenv(dotenv_path="data\.env")
+load_dotenv(dotenv_path="data/.env")
 import os
 from modules.config import global_config, setup_runtime_config
 from modules.read_tool import read_structured_paragraphs
@@ -10,7 +10,7 @@ from modules.write_out_tool import write_to_markdown
 from modules.markitdown_tool import markitdown_tool
 
 # 加载环境变量
-load_dotenv(dotenv_path="data\.env")
+load_dotenv(dotenv_path="data/.env")
 
 
 # 主程序流程
@@ -28,7 +28,7 @@ def main():
     # 动态获取输入文件路径，直到提供有效路径
     while True:
         # 初始化服务（默认使用Kimi）
-        llm_service = LLMService(provider=input("""请选择需要使用的API平台（"kimi","gpt","deepseek"）:""".strip()))
+        llm_service = LLMService(provider=input("""请选择需要使用的API平台（"kimi","gpt","deepseek","ollama"）:""".strip()))
 
         input_file = input("请输入文件路径: ").strip()
 
