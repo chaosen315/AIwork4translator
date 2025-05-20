@@ -40,7 +40,7 @@ project_root/
 
 ## 效果演示
 
-![Frame 27](https://github.com/user-attachments/assets/b22bfb0e-d7a9-40f7-8f69-b02b524b5b08)
+![image1](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444430551-b22bfb0e-d7a9-40f7-8f69-b02b524b5b08.jpg)
 
 ## 支持环境
 
@@ -74,9 +74,13 @@ Python:3.10-3.12
 3. 运行`\webui_project`文件夹中的`app.py`。
 4. 打开终端返回的链接，或者直接在浏览器中输入`http://localhost:8001/`。
 5. 在界面中依次点击“选择文件”与“验证文件/词典”，等待成功提示后点击“开始处理文本”即可等待结果文件的下载链接生成。
-![0ddb9cba7b38545db9a37741c2297a04](https://github.com/user-attachments/assets/9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1)
+
+![image2](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444591524-9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1.png)
+
 界面截图
-![image](https://github.com/user-attachments/assets/2b8658fb-1f83-4e58-a731-11d1c1e2559c)
+
+![image3](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/180406E35AFC69EE34ACE24CAAB3E460.png)
+
 下载页面：在右键菜单中选择“另存为”即可。
 
 ## 名词表格式
