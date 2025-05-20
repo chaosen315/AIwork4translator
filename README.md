@@ -76,7 +76,7 @@ Python:3.10-3.12
 5. 在界面中依次点击“选择文件”与“验证文件/词典”，等待成功提示后点击“开始处理文本”即可等待结果文件的下载链接生成。
 ![0ddb9cba7b38545db9a37741c2297a04](https://github.com/user-attachments/assets/9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1)
 界面截图
-![7c13ee8301662254329064ced1564e09](https://github.com/user-attachments/assets/bd3912df-b293-4d40-8745-9d41a39246d0)
+![image](https://github.com/user-attachments/assets/2b8658fb-1f83-4e58-a731-11d1c1e2559c)
 下载页面：在右键菜单中选择“另存为”即可。
 
 ## 名词表格式
