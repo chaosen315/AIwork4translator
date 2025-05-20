@@ -9,7 +9,7 @@ Precise AI translation method with noun comparison list.
 ```python
 project_root/
 ├── data/
-│   ├── .env
+│   └── .env
 ├── src/
 │   ├── main.py
 │   └── modules/
@@ -20,6 +20,26 @@ project_root/
 │       ├── markitdown_tool.py
 │       ├── read_tool.py
 │       └── write_out_tool.py
+├── webui_project/
+│   ├── data/
+│       └── .env
+│   ├── app.py
+│   ├── modules/
+│       ├── __init__.py
+│       ├── api_tool.py
+│       ├── config.py
+│       ├── csv_process_tool.py
+│       ├── markitdown_tool.py
+│       ├── read_tool.py
+│       └── write_out_tool.py
+│   ├── static/
+│       ├── script.js
+│       └── style.css
+│   ├── templates/
+│       └── index.html
+│   ├── uploads/
+│       └── readme.md
+
 ```
 
 ## 原理
