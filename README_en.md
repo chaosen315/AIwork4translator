@@ -5,7 +5,7 @@
 ```python
 project_root/
 ├── data/
-│   ├── .env
+│   └── .env
 ├── src/
 │   ├── main.py
 │   └── modules/
@@ -16,6 +16,25 @@ project_root/
 │       ├── markitdown_tool.py
 │       ├── read_tool.py
 │       └── write_out_tool.py
+├── webui_project/
+│   ├── data/
+│       └── .env
+│   ├── app.py
+│   ├── modules/
+│       ├── __init__.py
+│       ├── api_tool.py
+│       ├── config.py
+│       ├── csv_process_tool.py
+│       ├── markitdown_tool.py
+│       ├── read_tool.py
+│       └── write_out_tool.py
+│   ├── static/
+│       ├── script.js
+│       └── style.css
+│   ├── templates/
+│       └── index.html
+│   ├── uploads/
+│       └── readme.md
 ```
 
 ## Principle
@@ -38,7 +57,7 @@ P.S. For readers who use non-Chinese languages: This project can theoretically a
 
 ## Effect Display
 
-![Frame 27](https://github.com/user-attachments/assets/b22bfb0e-d7a9-40f7-8f69-b02b524b5b08)
+![image1](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444430551-b22bfb0e-d7a9-40f7-8f69-b02b524b5b08.jpg)
 
 ## Supportive Environment
 
@@ -72,9 +91,13 @@ Here is the tutorial for using the WebUI executor:
 3. Run `app.py` in the `\webui_project folder`.
 4. Open the link returned by the terminal or type `http://localhost:8001/` directly into your browser.
 5. Click "选择文件" and "验证文件/验证词典" in the interface, wait for the successful prompt, and then click "开始处理文本" to wait for the download link of the result file to be generated.
-! [0ddb9cba7b38545db9a37741c2297a04] (https://github.com/user-attachments/assets/9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1)
+
+![image2](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444591524-9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1.png)
+
 Screenshot of the interface
-! [7c13ee8301662254329064ced1564e09] (https://github.com/user-attachments/assets/bd3912df-b293-4d40-8745-9d41a39246d0)
+
+![image3](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/180406E35AFC69EE34ACE24CAAB3E460.png)
+
 Download page: Select "Save As" from the right-click menu.
 
 Note:
@@ -84,7 +107,7 @@ Note:
 
 ## Noun table format
 
-| original | Translation |
+| Original | Translation |
 | --- | --- |
 | …… | …… |
 | …… | …… |
