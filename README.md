@@ -65,17 +65,18 @@ project_root/
 ## 支持环境
 
 ```python
-Python:3.10-3.12
+Python:3.10-3.13
 ```
 
 ## 命令行实现的使用教程
 
 这是使用命令行指令执行程序的使用教程：
 
+0. 下载`requirements.txt`并执行`pip install -r requirements.txt`
 1. 下载`\src`与`\data`文件夹。
 2. 修改`\data\.env`中的环境变量，将自己的API KEY复制粘贴进去并保存。
 3. 运行`\src`文件夹中的`main.py`。
-4. 选择使用的API供应商。（目前只支持kimi，gpt，deepseek）
+4. 选择使用的API供应商。（目前只支持kimi，gpt，deepseek,ollama）
 5. 输入需要翻译的文件路径。（根据Markitdown文档的支持格式：PDF，PowerPoint，Word，Excel，HTML，基于文本的格式（CSV，JSON，XML），EPubs）
 6. 输入csv格式的名词表文件路径。
 7. 等待程序完成翻译并保存为md文档。
