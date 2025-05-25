@@ -1,14 +1,8 @@
-csv
 dotenv
 fastapi
-json
 nltk
 openai
-os
 pathlib
-re
-shutil
-time
 typing
 uvicorn
-'markitdown[all]'
+markitdown[all]

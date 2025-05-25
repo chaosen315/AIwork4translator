@@ -76,6 +76,30 @@ class DeepseekProvider(LLMProvider):
             temperature=0.3,
         )
         return completion.choices[0].message.content
+    
+class OllamaProvider(LLMProvider):
+    """Ollama API提供者"""
+
+    def __init__(self):
+        self.client = OpenAI(
+            base_url=os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1'),
+            api_key=os.getenv('OLLAMA_API_KEY', "ollama")
+        )
+        self.model = os.getenv('OLLAMA_MODEL', 'qwen2.5:7b')
+        print(f"使用Ollama模型: {self.model}")
+        print(f"使用Ollama API地址: {self.client.base_url}")
+        print(f"使用Ollama API密钥: {self.client.api_key}")
+
+    def generate_completion(self, prompt: str, system_prompt: str) -> str:
+        completion = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+        )
+        return completion.choices[0].message.content
 
 class LLMService:
     """LLM服务管理类"""
@@ -85,7 +109,8 @@ class LLMService:
         self.providers = {
             "kimi": KimiProvider,
             "gpt": GPTProvider,
-            "deepseek": DeepseekProvider
+            "deepseek": DeepseekProvider,
+            "ollama": OllamaProvider
         }
         self.Linkedprovider = self.providers.get(provider.lower())()
         self.system_prompt = "我需要一名专业的英语翻译职业人。擅长对长难句进行严谨的结构分析，简明扼要地翻译出通顺的中文长句，还可以利用名词表中的专有名词对英文原文进行正确的翻译。"
