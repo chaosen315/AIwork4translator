@@ -130,7 +130,7 @@ When using md files for translation, the program processes the text in "Structur
 1. 它默认文件中存在最多6级的标题结构，并智能地根据文本结构来进行文段切割。
 2. 它默认的分行符号为两个换行符号。
 ```
-
+The on-premise deployment model of Ollama is now supported. The local model is invoked by modifying the OLLAMA_BASE_URL and OLLAMA_MODEL in `\data\.env`.
 ## Contact Details
 
 If you have more ideas about the program or encounter deployment problems, you can send an email to [chasen0315@gmail.com](mailto:chasen0315@gmail.com) . We will respond within 48 hours (until 20/5/2025) at the latest.
