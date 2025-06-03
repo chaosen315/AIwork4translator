@@ -1,4 +1,5 @@
 from typing import Union,Tuple
+import re
 
 # @title 模块5：写入并累加更新markdown文件
 
@@ -30,6 +31,9 @@ def write_to_markdown(
     # 解析输入内容
     paragraph_text, metadata = _parse_content(content, mode)
 
+    # 过滤掉思考链内容
+    paragraph_text = _filter_think_content(paragraph_text)
+
     # 创建文件写入上下文
     with open(output_file_path, 'a', encoding='utf-8') as file:
         # 结构化写入逻辑
@@ -38,6 +42,14 @@ def write_to_markdown(
         else:
             # 兼容模式写入
             file.write(f"\n{paragraph_text}\n# end")
+
+def _filter_think_content(text: str) -> str:
+    """过滤掉思考链内容"""
+    # 移除<think>...</think>标签及其内容
+    filtered_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # 移除可能的空行
+    filtered_text = re.sub(r'\n{3,}', '\n\n', filtered_text)
+    return filtered_text.strip()
 
 def _parse_content(content, mode) -> Tuple[str, dict]:
     """统一解析输入内容"""
