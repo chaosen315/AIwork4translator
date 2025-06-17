@@ -10,6 +10,15 @@ Precise AI translation method with noun comparison list.
 project_root/
 ├── data/
 │   └── .env
+├── models/
+│   └── bert-large-cased-finetuned-conll03-english-for-ner/
+│       ├── config.json
+│       ├── gitattributes
+│       ├── model.safetensors
+│       ├── special_tokens_map.json
+│       ├── tokenizer.json
+│       ├── tokenizer_config.json
+│       └── vocab.txt
 ├── src/
 │   ├── main.py
 │   └── modules/
@@ -18,6 +27,7 @@ project_root/
 │       ├── config.py
 │       ├── csv_process_tool.py
 │       ├── markitdown_tool.py
+│       ├── ner_list_tool.py
 │       ├── read_tool.py
 │       └── write_out_tool.py
 ├── webui_project/
@@ -54,9 +64,11 @@ project_root/
 
 ## 特性
 
-借助名词表的正则过滤方法，AI在翻译文本时能够更准确地使用专有名词规定的译名，同时标注出可能同样是专有名词但没有对应译名的潜在专有名词。
+1. 通过大模型的实体名词识别任务，可以实现将全新的原文文本中的绝大多数实体名词识别并生成空白的名词表，供翻译者快速厘定术语的翻译规范。（目前仅在命令行实现的程序中可用。）
 
-在此基础上，翻译者可以快速更新迭代名词表，也可以减少名词统一的重复工作量
+2. 借助名词表的正则过滤方法，AI在翻译文本时能够更准确地使用专有名词规定的译名，同时标注出可能同样是专有名词但没有对应译名的潜在专有名词。
+
+3. 在此基础上，翻译者可以快速更新迭代名词表，也可以减少名词统一的重复工作量。
 
 ## 效果演示
 
@@ -78,8 +90,11 @@ Python:3.10-3.13
 3. 运行`\src`文件夹中的`main.py`。
 4. 选择使用的API供应商。（目前只支持kimi，gpt，deepseek,ollama）
 5. 输入需要翻译的文件路径。（根据Markitdown文档的支持格式：PDF，PowerPoint，Word，Excel，HTML，基于文本的格式（CSV，JSON，XML），EPubs）
-6. 输入csv格式的名词表文件路径。
-7. 等待程序完成翻译并保存为md文档。
+6. 如果没有csv格式的名词表，输入n进入空白名词表生成流程，空白名词表生成结束后程序将自动关闭。
+（注意：为了实现该功能，你需要通过[huggingface](https://huggingface.co/chaosen/bert-large-cased-finetuned-conll03-english-for-ner)链接下载模型文件到`.\models\bert-large-cased-finetuned-conll03-english-for-ner`文件夹中,具体结构详见文档开头的程序结构示意图。)
+8. 如果已有csv格式的名词表且已经输入对应的译文，输入y进入名词表文件上传流程。
+9. 输入csv格式的名词表文件路径。
+10. 等待程序完成翻译并保存为md文档。
 
 注意事项：
 
