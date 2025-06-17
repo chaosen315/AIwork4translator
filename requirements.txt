@@ -6,3 +6,4 @@ pathlib
 typing
 uvicorn
 markitdown[all]
+transformers
