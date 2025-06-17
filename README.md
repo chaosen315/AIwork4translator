@@ -92,9 +92,9 @@ Python:3.10-3.13
 5. 输入需要翻译的文件路径。（根据Markitdown文档的支持格式：PDF，PowerPoint，Word，Excel，HTML，基于文本的格式（CSV，JSON，XML），EPubs）
 6. 如果没有csv格式的名词表，输入n进入空白名词表生成流程，空白名词表生成结束后程序将自动关闭。
 （注意：为了实现该功能，你需要通过[huggingface](https://huggingface.co/chaosen/bert-large-cased-finetuned-conll03-english-for-ner)链接下载模型文件到`.\models\bert-large-cased-finetuned-conll03-english-for-ner`文件夹中,具体结构详见文档开头的程序结构示意图。)
-8. 如果已有csv格式的名词表且已经输入对应的译文，输入y进入名词表文件上传流程。
-9. 输入csv格式的名词表文件路径。
-10. 等待程序完成翻译并保存为md文档。
+7. 如果已有csv格式的名词表且已经输入对应的译文，输入y进入名词表文件上传流程。
+8. 输入csv格式的名词表文件路径。
+9. 等待程序完成翻译并保存为md文档。
 
 注意事项：
 
