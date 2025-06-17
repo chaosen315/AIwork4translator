@@ -1,16 +1,19 @@
 from dotenv import load_dotenv
+from time import perf_counter
+import csv
 # 加载环境变量
-load_dotenv(dotenv_path="data/.env")
-import os
+load_dotenv(dotenv_path="data\.env")
+import os, time
 from modules.config import global_config, setup_runtime_config
 from modules.read_tool import read_structured_paragraphs
 from modules.csv_process_tool import get_valid_path, validate_csv_file, load_terms_dict, find_matching_terms
 from modules.api_tool import LLMService
 from modules.write_out_tool import write_to_markdown
 from modules.markitdown_tool import markitdown_tool
-
+from modules.count_tool import count_md_words
+from modules.ner_list_tool import EntityRecognizer
 # 加载环境变量
-load_dotenv(dotenv_path="data/.env")
+load_dotenv(dotenv_path="data\.env")
 
 
 # 主程序流程
@@ -63,9 +66,28 @@ def main():
     output_base_filename = f"{base_name}_output"
     output_md_file = os.path.join(input_dir, f"{output_base_filename}{extension}")
 
-    # 获取并验证CSV文件路径
-    csv_file = get_valid_path("请输入名词表CSV文件路径: ", validate_csv_file)
+    # === 新增空白名词表生成分支 ===
+    # 询问用户是否有名词表
+    has_glossary = input("您是否已有名词表CSV文件？(y/n): ").strip().lower()
+    
+    if has_glossary == 'n':
+        print("正在从文档中提取专业名词生成空白名词表...")
+        try:
+            recognizer = EntityRecognizer()
+            base_csv_path = recognizer.process_file(input_md_file)
+        except Exception as e:
+            print(f"名词提取失败: {str(e)}")
+            print("请检查文档格式后重试")
+            return
+        print(f"\n空白名词表已生成: {base_csv_path}")
+        print("请填写该文件中的译文列，然后重新运行程序使用名词表")
+        print("程序将在5秒后退出...")
+        time.sleep(5)
+        return  # 结束程序
 
+    # 获取并验证CSV文件路径（只有用户回答'y'才会执行到这里）
+    csv_file = get_valid_path("请输入名词表CSV文件路径: ", validate_csv_file)
+    start_time = perf_counter()
     # 初始化
     terms_dict = load_terms_dict(csv_file)
 
@@ -79,6 +101,7 @@ def main():
     # print(PS)
     paragraphs = read_structured_paragraphs(input_md_file,max_chunk_size=CHUNK_SIZE,preserve_structure=PS)
     # 处理循环改造
+    total_token = 0
     for segment in paragraphs:
         # 结构化模式解包
         if PS:
@@ -92,11 +115,11 @@ def main():
         # 构造prompts并调用API
         prompt = llm_service.create_prompt(paragraph, specific_terms_dict)
         try:
-            response = llm_service.call_ai_model_api(prompt)
+            response,usage_tokens = llm_service.call_ai_model_api(prompt)
         except Exception as e:
             print(f"API调用失败：{e}")
             continue
-
+        total_token += usage_tokens
         # 写入输出文件
         if PS:
             write_to_markdown(
@@ -111,7 +134,18 @@ def main():
 
         # 提示用户可以查看输出文件
         print(f"已处理一段内容，输出已保存到 {output_md_file}")
-
+    end_time = perf_counter()
+    time_taken = end_time-start_time
+    print(f'Time taken: {time_taken:.2f} seconds.')
+    raw_len = count_md_words(input_md_file)
+    processed_len = count_md_words(output_md_file)
+    new_row = [str(input_md_file),raw_len,str(output_md_file),processed_len,total_token,time_taken]
+    file_exists = os.path.isfile('counting_table.csv') and os.path.getsize('counting_table.csv') > 0
+    with open('counting_table.csv','a',newline='',encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(['Input file','Input len','Output file','Output len','Tokens','Taken time'])
+        writer.writerow(new_row)
         # 在这里可以添加用户交互逻辑，比如询问是否继续处理下一段
 
 if __name__ == "__main__":
