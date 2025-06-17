@@ -14,7 +14,7 @@ class EntityRecognizer:
     }
     
     def __init__(self):
-        self.target_name = "bert-large-cased-finetuned-conll03-english"
+        self.target_name = "bert-large-cased-finetuned-conll03-english-for-ner"
         self.model_path = self._find_model_directory()
         self.ner_pipeline = self._create_pipeline()
 
