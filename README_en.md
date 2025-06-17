@@ -6,6 +6,15 @@
 project_root/
 ├── data/
 │   └── .env
+├── models/
+│   └── bert-large-cased-finetuned-conll03-english-for-ner/
+│       ├── config.json
+│       ├── gitattributes
+│       ├── model.safetensors
+│       ├── special_tokens_map.json
+│       ├── tokenizer.json
+│       ├── tokenizer_config.json
+│       └── vocab.txt
 ├── src/
 │   ├── main.py
 │   └── modules/
@@ -14,6 +23,7 @@ project_root/
 │       ├── config.py
 │       ├── csv_process_tool.py
 │       ├── markitdown_tool.py
+│       ├── ner_list_tool.py
 │       ├── read_tool.py
 │       └── write_out_tool.py
 ├── webui_project/
@@ -49,9 +59,9 @@ Thanks to [markitdown](https://github.com/microsoft/markitdown), it can now hand
 
 ## Characteristic
 
-With the help of the regular filtering method of the noun table, AI can more accurately use the specified translations of proper nouns when translating texts, while marking potential proper nouns that may also be proper nouns but do not have corresponding translations.
-
-On this basis, translators can quickly update and iterate the noun table, and also reduce the repetitive work of noun unification.
+1. Through the entity noun recognition task of large models, it is possible to identify and generate a blank noun list of most entity nouns in the original text, providing translators with a quick way to determine the translation norms for terms. (Currently only available in command-line implemented programs.)
+2. With the help of the regular filtering method of the noun table, AI can more accurately use the specified translations of proper nouns when translating texts, while marking potential proper nouns that may also be proper nouns but do not have corresponding translations.
+3. On this basis, translators can quickly update and iterate the noun table, and also reduce the repetitive work of noun unification.
 
 P.S. For readers who use non-Chinese languages: This project can theoretically also be applied to the translation of Chinese into foreign languages, but it is necessary to manually modify the prompts in `\modules\api_tool.py`.
 
@@ -69,13 +79,18 @@ Python:3.10-3.12
 
 Here's a tutorial for executing a program using command-line instructions:
 
+0. Download `requirements.txt` and execute `pip install -r requirements.txt`.
 1. Download the `\src` and `\data` folders.
 2. Modify the environment variable in `\data\.env`, copy and paste your API KEY into it, and save it.
 3. Run `main.py` in the `\src` folder.
 4. Choose the API vendor you want to use. (Currently only kimi, gpt, deepseek, ollama are supported)
 5. Enter the path of the file to be translated. (Supported formats according to Markitdown documents: PDF, PowerPoint, Word, Excel, HTML, text-based formats (CSV, JSON, XML), EPubs)
-6. Enter the path to the glossary file in CSV format.
-7. Wait for the program to finish translating and save as an Markdown document.
+6. If there is no noun table in csv format, enter `n` to enter the blank noun table generation process. After the blank noun table generation is completed, the program will automatically close.
+(Note: In order to implement this function, you need to download the model file from the [huggingface](https://huggingface.co/chaosen/bert-large-cased-finetuned-conll03-english-for-ner) link to the `.\models\bert-large-cased-finetuned-conll03-english-for-ner` folder. For the specific structure, please refer to the program structure diagram at the beginning of the document.)
+7. If you already have a noun table in csv format and have entered the corresponding translation, enter `y` to enter the noun table file upload process.
+8. Enter the path of the noun table file in csv format.
+8. Enter the path to the glossary file in CSV format.
+9. Wait for the program to finish translating and save as an Markdown document.
 
 Notes:
 
@@ -127,8 +142,8 @@ Since the md files converted by morkitdown do not have a title structure, all no
 When using md files for translation, the program processes the text in "Structured Translation Mode" by default. If the text structure does not meet the following requirements, an error may occur:
 
 ```python
-1. 它默认文件中存在最多6级的标题结构，并智能地根据文本结构来进行文段切割。
-2. 它默认的分行符号为两个换行符号。
+1. It assumes that there are up to 6 levels of title structure in the file by default, and intelligently splits the text into sections based on the text structure.
+2. Its default line symbol is two line breaks.
 ```
 The on-premise deployment model of Ollama is now supported. The local model is invoked by modifying the OLLAMA_BASE_URL and OLLAMA_MODEL in `\data\.env`.
 ## Contact Details
