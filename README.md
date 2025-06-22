@@ -25,6 +25,7 @@ project_root/
 │       ├── __init__.py
 │       ├── api_tool.py
 │       ├── config.py
+│       ├── count_tool.py
 │       ├── csv_process_tool.py
 │       ├── markitdown_tool.py
 │       ├── ner_list_tool.py
@@ -38,6 +39,7 @@ project_root/
 │       ├── __init__.py
 │       ├── api_tool.py
 │       ├── config.py
+│       ├── count_tool.py
 │       ├── csv_process_tool.py
 │       ├── markitdown_tool.py
 │       ├── read_tool.py
