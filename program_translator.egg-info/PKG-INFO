@@ -1,9 +1,10 @@
 Metadata-Version: 2.4
 Name: program-translator
-Version: 0.1.0
+Version: 1.1.0
 Summary: 专业文档翻译工具，通过专有名词识别和正则过滤确保术语准确翻译
 Author: User
 Requires-Python: >=3.11
+License-File: LICENSE
 Requires-Dist: fastapi==0.115.12
 Requires-Dist: uvicorn==0.34.2
 Requires-Dist: pydantic==2.11.9
@@ -84,3 +85,4 @@ Requires-Dist: typing-inspection==0.4.1
 Requires-Dist: tzdata==2025.2
 Requires-Dist: urllib3==2.5.0
 Requires-Dist: google-genai>=1.52.0
+Dynamic: license-file

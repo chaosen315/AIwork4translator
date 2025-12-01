@@ -1,3 +1,5 @@
+LICENSE
+README.md
 pyproject.toml
 modules/__init__.py
 modules/api_tool.py
@@ -15,5 +17,8 @@ program_translator.egg-info/entry_points.txt
 program_translator.egg-info/requires.txt
 program_translator.egg-info/top_level.txt
 services/__init__.py
+tests/test_api_direct.py
+tests/test_api_providers.py
 tests/test_read_count.py
 tests/test_webui_app.py
+tests/test_write_out_tool.py
