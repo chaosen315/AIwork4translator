@@ -1,153 +1,166 @@
 # AIwork4translator
 
-## Program Structure
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-```python
+Precise technical-document translation powered by glossary-aware prompts and robust Markdown segmentation. This project provides both CLI and WebUI with a unified module layer.
+
+## Table of Contents
+- Overview
+- Key Features
+- Project Structure (Unified Root)
+- Installation
+- Quick Start (uv)
+- Usage
+  - CLI
+  - WebUI
+- Environment & Defaults
+- Testing
+- FAQ
+- Changelog & Migration Notes
+ - Roadmap
+ - Contact
+
+## Overview
+AIwork4translator focuses on translating technical documents while preserving terminology accuracy. It detects and protects domain-specific terms and provides an editor workflow to review translations efficiently.
+
+### Principles
+- Glossary-first prompts: regex and glossary matching identify domain terms per segment; prompts instruct the model to use exact translations consistently.
+- Compared to typical RAG uploads for small glossaries, early tests show ~99% less extra token overhead and ~35% more term hits. Overall quality improves due to stable terminology.
+- Since no glossary can be complete, newly detected terms are automatically highlighted/summarized in the output to aid review and glossary updates.
+
+## Key Features
+- Terminology detection & protection via glossary matching and regex-based scanning
+- Multi-format input support: native `.md/.txt`, and conversion for PDF/Word/Excel/HTML via MarkItDown
+- Multiple LLM providers: Kimi, OpenAI (GPT), DeepSeek, and optional local models via Ollama
+- CLI and WebUI modes with the same core logic
+- Two-column Markdown editor (original vs translation) with live progress
+- Real-time progress polling and safe autosave after completion
+- Interactive confirmation for non-Markdown conversion
+- Optional empty glossary generation via NER (CLI)
+- Structured vs flat translation modes based on Markdown headers
+
+## Project Structure (Unified Root)
+```
 project_root/
 ├── data/
-│   └── .env
+│   ├── .env
+│   └── README_en.md
 ├── models/
-│   └── bert-large-cased-finetuned-conll03-english-for-ner/
-│       ├── config.json
-│       ├── gitattributes
-│       ├── model.safetensors
-│       ├── special_tokens_map.json
-│       ├── tokenizer.json
-│       ├── tokenizer_config.json
-│       └── vocab.txt
-├── src/
-│   ├── main.py
-│   └── modules/
-│       ├── __init__.py
-│       ├── api_tool.py
-│       ├── config.py
-│       ├── count_tool.py
-│       ├── csv_process_tool.py
-│       ├── markitdown_tool.py
-│       ├── ner_list_tool.py
-│       ├── read_tool.py
-│       └── write_out_tool.py
-├── webui_project/
-│   ├── data/
-│       └── .env
-│   ├── app.py
-│   ├── modules/
-│       ├── __init__.py
-│       ├── api_tool.py
-│       ├── config.py
-│       ├── count_tool.py
-│       ├── csv_process_tool.py
-│       ├── markitdown_tool.py
-│       ├── read_tool.py
-│       └── write_out_tool.py
-│   ├── static/
-│       ├── script.js
-│       └── style.css
-│   ├── templates/
-│       └── index.html
-│   ├── uploads/
-│       └── readme.md
+│   └── dbmdz/bert-large-cased-finetuned-conll03-english-for-ner/
+├── modules/
+│   ├── api_tool.py          # LLMService, returns (content, tokens), no RAG cache
+│   ├── config.py            # GlobalConfig (env-first)
+│   ├── read_tool.py         # Structured Markdown segmentation
+│   ├── count_tool.py        # Paragraph counting (mirrors segmentation logic)
+│   ├── csv_process_tool.py  # CSV validation & term matching
+│   ├── markitdown_tool.py   # Non-Markdown → Markdown conversion
+│   ├── write_out_tool.py    # Structured/flat writing (no "# end" by default)
+│   └── ner_list_tool.py     # Robust model path detection (prefers root models/)
+├── templates/
+│   ├── index.html
+│   └── editor.html
+├── static/
+│   ├── style.css
+│   ├── script.js
+│   └── editor.js
+├── uploads/
+├── app.py                   # WebUI entry (provides main())
+├── main.py                  # CLI entry (interactive)
+├── baseline.py              # Baseline CLI (unified API call, no RAG cache)
+├── ner_list_check.py        # NER-based glossary generator
+└── pyproject.toml           # Scripts: CLI/WebUI
 ```
 
-## Principle
+## Installation
+- Requirements: Python 3.11+
+- Dependency manager: `uv`
+- Virtual environment: `.venv` (default)
 
-The highlight of this program is that it captures proper nouns in the text through regular expression methods to ensure that LLM can accurately translate the proper nouns when translating. Preliminary experimental tests show that this method can save 99% of the additional token consumption caused by traditional RAG technology, and the number of proper nouns captured has increased by 35% compared to traditional RAG technology. The quality of text translation has significantly improved due to the enhanced accuracy of proper nouns.
-
-Since it is naturally impossible for a noun list to include new nouns in a new text, the identified new nouns will be added below the text after AI translation to facilitate proofreading and editing.
-
-The most rigorous method of this program is to input the original text file in md format and the noun table file in csv format, and output the translated text file in md format.
-
-Thanks to [markitdown](https://github.com/microsoft/markitdown), it can now handle other file formats, but it has not been fully tested. PDF files work well (non-OCR), OCR PDF files still need to be tested.
-
-## Characteristic
-
-1. Through the entity noun recognition task of large models, it is possible to identify and generate a blank noun list of most entity nouns in the original text, providing translators with a quick way to determine the translation norms for terms. (Currently only available in command-line implemented programs.)
-2. With the help of the regular filtering method of the noun table, AI can more accurately use the specified translations of proper nouns when translating texts, while marking potential proper nouns that may also be proper nouns but do not have corresponding translations.
-3. On this basis, translators can quickly update and iterate the noun table, and also reduce the repetitive work of noun unification.
-
-P.S. For readers who use non-Chinese languages: This project can theoretically also be applied to the translation of Chinese into foreign languages, but it is necessary to manually modify the prompts in `\modules\api_tool.py`.
-
-## Effect Display
-
-![image1](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444430551-b22bfb0e-d7a9-40f7-8f69-b02b524b5b08.jpg)
-
-## Supportive Environment
-
-```python
-Python:3.10-3.12
+```
+uv sync
 ```
 
-## Tutorial for using the command-line implementation
+## Quick Start (uv)
+```
+# Sync project dependencies (creates .venv)
+uv sync
 
-Here's a tutorial for executing a program using command-line instructions:
+# Install / remove dependencies
+uv add <package>
+uv remove <package>
 
-0. Download `requirements.txt` and execute `pip install -r requirements.txt`.
-1. Download the `\src` and `\data` folders.
-2. Modify the environment variable in `\data\.env`, copy and paste your API KEY into it, and save it.
-3. Run `main.py` in the `\src` folder.
-4. Choose the API vendor you want to use. (Currently only kimi, gpt, deepseek, ollama are supported)
-5. Enter the path of the file to be translated. (Supported formats according to Markitdown documents: PDF, PowerPoint, Word, Excel, HTML, text-based formats (CSV, JSON, XML), EPubs)
-6. If there is no noun table in csv format, enter `n` to enter the blank noun table generation process. After the blank noun table generation is completed, the program will automatically close.
-(Note: In order to implement this function, you need to download the model file from the [huggingface](https://huggingface.co/chaosen/bert-large-cased-finetuned-conll03-english-for-ner) link to the `.\models\bert-large-cased-finetuned-conll03-english-for-ner` folder. For the specific structure, please refer to the program structure diagram at the beginning of the document.)
-7. If you already have a noun table in csv format and have entered the corresponding translation, enter `y` to enter the noun table file upload process.
-8. Enter the path of the noun table file in csv format.
-8. Enter the path to the glossary file in CSV format.
-9. Wait for the program to finish translating and save as an Markdown document.
+# Run CLI (recommended)
+uv run main.py
+# Or
+python main.py
 
-Notes:
+# Run WebUI
+python app.py
+# Or script entry
+program-translator-webui
 
-- In order to run the program properly, you must modify the environment variables in the `\data` folder. Replace 'API_KEY' with your own.
-- The vendor used in the development process is Kimi, and the API access code of OpenAI and Deepseek has not been tested because there is no API balance for the latter.
-
-## Tutorial on how to use the WebUI implementation
-
-Here is the tutorial for using the WebUI executor:
-
-1. Download the `\webui_project` folder.
-2. Modify the environment variable in `\webui_project\data\.env`, copy and paste your API KEY into it and save it.
-3. Run `app.py` in the `\webui_project folder`.
-4. Open the link returned by the terminal or type `http://localhost:8001/` directly into your browser.
-5. Click "选择文件" and "验证文件/验证词典" in the interface, wait for the successful prompt, and then click "开始处理文本" to wait for the download link of the result file to be generated.
-
-![image2](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/444591524-9efb2f04-2aa1-4fe7-ad3d-b206f227f3d1.png)
-
-Screenshot of the interface
-
-![image3](https://github.com/chaosen315/AIwork4translator/blob/1.0.0-release/images/180406E35AFC69EE34ACE24CAAB3E460.png)
-
-Download page: Select "Save As" from the right-click menu.
-
-Note:
-
-*   To run the program properly, you must modify the environment variables in the `\data` folder. Replace `API_KEY` with your own.
-*   The provider used in the development process is Kimi. Since there is no API balance for OpenAI and Deepseek, the API access codes of the latter two have not been tested.
-
-## Noun table format
-
-| Original | Translation |
-| --- | --- |
-| …… | …… |
-| …… | …… |
-
-After providing the glossary, the program sets up a strict review step to ensure that the glossary can be used correctly. You can ensure the following standards in advance to reduce the time spent on this step:
-
-```python
-1. Make sure the file has no blank lines or empty values.
-2. Ensure that there are no duplicate values ​​in the source column.
-3. Make sure it can be decoded with "UTF-8".
+# Run tests
+python -m pytest
 ```
 
-## Advanced Use
+## Important Notes for Translation
 
-Since the md files converted by morkitdown do not have a title structure, all non-md files that need to be translated are translated through the path of "unstructured translation mode". It does not recognize the title structure of the md document.
+- Configuration & secrets: Set API keys in `data/.env` and never commit secrets. On ≥3 consecutive API failures, run the CLI API test and check your network/proxy. Kimi defaults: `BASE_URL=https://api.moonshot.cn/v1`, `MODEL=kimi-k2-turbo-preview`.
+- Glossary quality & performance: CSV must have 2 columns, UTF-8 encoding, no empty rows, and unique source terms. Very large glossaries increase matching time—start with core terms. Multi-word terms are more stable; precompiled regex and caching are planned.
+- Input & structure: Prefer native Markdown. Non-Markdown files are auto-converted; please review the converted file before continuing. Structured mode relies on heading levels—use `#`/`##` reasonably.
+- Paragraphs & large files: Very long paragraphs are split intelligently. Large files take longer; WebUI recommends ≤10MB. CLI shows progress as `[current/total]`.
+- Consistency: Lower `temperature` improves term consistency. The prompt explicitly injects term mappings to stabilize outputs.
+- Local models: For Ollama, set `OLLAMA_BASE_URL` and `OLLAMA_MODEL` in `.env`. Ensure the service is running before use.
+- Logging & outputs: CLI prints `Total time: xh xm xs` (Chinese format enabled). `counting_table.csv` records raw seconds and tokens. WebUI logs include timestamps.
 
-When using md files for translation, the program processes the text in "Structured Translation Mode" by default. If the text structure does not meet the following requirements, an error may occur:
+## Usage
+### CLI
+- Run `uv run main.py` (or `python main.py`)
+- Select the provider (kimi/gpt/deepseek/ollama)
+- Enter the input file path
+  - If the file is not Markdown, it will be converted via MarkItDown and you will be prompted to continue (y/n)
+- If you don’t have a glossary, choose `n` to generate an empty glossary via NER, then exit and fill the translation column
+- If you have a glossary, provide the CSV path and proceed with translation
+- Progress prints: `Translating segment [current]/[total]`
 
-```python
-1. It assumes that there are up to 6 levels of title structure in the file by default, and intelligently splits the text into sections based on the text structure.
-2. Its default line symbol is two line breaks.
-```
-The on-premise deployment model of Ollama is now supported. The local model is invoked by modifying the OLLAMA_BASE_URL and OLLAMA_MODEL in `\data\.env`.
-## Contact Details
+### WebUI
+- Run `uv run app.py`
+- Open `http://localhost:8008/`
+- On the home page:
+  - Upload original file (`.md` or convertible format) and validate
+  - Upload glossary CSV and validate
+  - Choose provider, click “Use Two-Column Editor”, then in the editor page click “Start Translation”
+- Endpoints tested: `/validate-file`, `/start-translation`, `/translation-progress`, `/save-content`, `/download`, `/open-file`
+- After completion, autosave checks every ~20 seconds
 
-If you have more ideas about the program or encounter deployment problems, you can send an email to [chasen0315@gmail.com](mailto:chasen0315@gmail.com) . We will respond within 48 hours (until 20/5/2025) at the latest.
+## Environment & Defaults
+- Environment file: `data/.env`
+- Default provider config for Kimi:
+  - `KIMI_BASE_URL=https://api.moonshot.cn/v1`
+  - `model=kimi-k2-turbo-preview`
+- Suggested parameters: `max_tokens=2048`, `temperature=0.7`, `top_p=0.95`
+- Keep API keys secure and do not commit to the repository
+
+## Testing
+- Run all tests: `python -m pytest`
+- Tests are aligned to the unified root structure
+
+## FAQ
+- The editor shows progress as segments are processed; content updates incrementally
+- Non-Markdown files are converted and require a user confirmation before translation
+- Default writing mode does not append `# end` in flat mode (to match CLI/WebUI behavior)
+
+## Changelog & Migration Notes
+- 2025-11-29: Unified root structure (merged CLI/WebUI), removed RAG cache, aligned modules, updated script entries, cleaned legacy directories
+
+## Roadmap
+- v1.2.0: Core features completed (CLI, WebUI, provider support, unified modules).
+- Future versions:
+  - Enhance Markdown parsing performance with MinerU.
+  - Add a CAT-like interactive table view (source/target aligned per sentence) for efficient editing.
+  - Support real-time glossary updates: auto-adding unfamiliar terms during translation and allowing quick edits.
+  - Improve empty glossary generation: include type plus translation suggestions for faster review.
+
+## Contact
+Email: chasen0315@gmail.com (reply within 24 hours by 2025-12-29)

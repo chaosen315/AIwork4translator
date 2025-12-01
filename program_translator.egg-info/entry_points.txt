@@ -1,0 +1,3 @@
+[console_scripts]
+program-translator-cli = main:main
+program-translator-webui = app:main
