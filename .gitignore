@@ -16,7 +16,6 @@ data/**
 # Models (keep directory, ignore heavy weights)
 models/**
 !models/.gitkeep
-/
 
 # Logs
 *.log
