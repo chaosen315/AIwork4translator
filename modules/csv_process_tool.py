@@ -7,39 +7,69 @@ import nltk
 def get_valid_path(filepath_prompt, validate_func):
     while True:
         path = input(filepath_prompt).strip()
-        if validate_func(path):
-            return path
+        is_valid, updated_path = validate_func(path)
+        if is_valid:
+            return updated_path
         print(f"路径 {path} 不符合要求，请重新输入。")
 
 def validate_csv_file(path):
+    """
+    验证CSV文件格式，支持XLSX文件自动转换
+    返回 (is_valid, updated_path) 元组
+    """
     if not os.path.exists(path):
         print("错误：文件不存在")
-        return False
-    if not path.lower().endswith('.csv'):
+        return False, path
+    
+    original_path = path
+    converted_path = None
+    
+    # Handle XLSX files by converting them to CSV first
+    if path.lower().endswith('.xlsx'):
+        try:
+            import pandas as pd
+            # Convert XLSX to CSV
+            converted_path = path.rsplit('.', 1)[0] + '_converted.csv'
+            df = pd.read_excel(path)
+            # Ensure the DataFrame has exactly 2 columns
+            if len(df.columns) <= 2:
+                print(f"错误：XLSX文件必须至少包含两列，当前有{len(df.columns)}列")
+                return False, original_path
+            # Rename columns to ensure consistent naming
+            df.columns = ['term', 'definition']
+            df.to_csv(converted_path, index=False, encoding='utf-8-sig')
+            print(f"成功：XLSX文件已转换为CSV格式：{converted_path}")
+            # Update path to use the converted CSV file
+            path = converted_path
+        except Exception as e:
+            print(f"错误：转换XLSX文件时出错：{e}")
+            return False, original_path
+    elif not path.lower().endswith('.csv'):
         print("错误：文件不是CSV格式")
-        return False
+        return False, original_path
+    
     try:
         with open(path, 'r', encoding='utf-8-sig') as f:
             csv_reader = csv.reader(f)
             headers = next(csv_reader, None)
             if headers is None or len(headers) != 2:
                 print("错误：CSV文件必须包含两列")
-                return False
+                return False, original_path
             for row_num, row in enumerate(csv_reader, start=2):
                 if len(row) != 2:
                     print(f"错误：第 {row_num} 行列数不等于2")
-                    return False
+                    return False, original_path
                 term, definition = row
                 if not term.strip():
                     print(f"错误：第 {row_num} 行第一列（术语）为空")
-                    return False
+                    return False, original_path
                 if not definition.strip():
                     print(f"错误：第 {row_num} 行第二列（定义）为空")
-                    return False
-        return True
+                    return False, original_path
+        return True, path
     except Exception as e:
         print(f"错误：读取CSV文件时出错：{e}")
-        return False
+        return False, original_path
 
 nltk.data.path.append('/tmp/nltk_data')
 nltk.download('punkt', download_dir='/tmp/nltk_data')
