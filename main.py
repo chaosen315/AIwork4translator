@@ -15,7 +15,7 @@ def main():
     PS = global_config.preserve_structure
     CHUNK_SIZE = global_config.max_chunk_size
     while True:
-        llm_service = LLMService(provider=input("""请选择需要使用的API平台（"kimi","gpt","deepseek","ollama"）:""".strip()))
+        llm_service = LLMService(provider=input("""请选择需要使用的API平台（"kimi","gpt","deepseek","sillion","gemini"）:""".strip()))
         input_file = input("请输入文件路径: ").strip()
         if not input_file:
             print("输入不能为空，请重新输入。")

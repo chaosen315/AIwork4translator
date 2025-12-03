@@ -7,6 +7,8 @@ import nltk
 def get_valid_path(filepath_prompt, validate_func):
     while True:
         path = input(filepath_prompt).strip()
+        # 智能去除双引号 - 处理用户输入时可能自带的引号
+        path = path.strip('"\'')  # 去除开头和结尾的双引号和单引号
         is_valid, updated_path = validate_func(path)
         if is_valid:
             return updated_path
