@@ -109,12 +109,17 @@ async def validate_file(
                     })
         elif file_type == 'csv':
             log_action("处理CSV文件", "开始验证CSV格式")
-            if not validate_csv_file(str(file_path)):
+            is_valid, updated_path = validate_csv_file(str(file_path))
+            if not is_valid:
                 log_error("CSV文件验证失败", "格式无效")
                 return JSONResponse({
                     "status": "error",
                     "message": "CSV文件格式无效，请检查文件内容"
                 })
+            # Update file_path if it was converted from XLSX
+            if updated_path != str(file_path):
+                file_path = Path(updated_path)
+                log_action("文件路径更新", f"XLSX已转换为CSV: {file_path}")
             log_action("CSV文件验证通过", str(file_path))
         log_action("文件验证完成", "准备返回结果")
         absolute_file_path = str(file_path.absolute())
