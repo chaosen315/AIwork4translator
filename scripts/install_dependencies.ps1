@@ -1,0 +1,2 @@
+param()
+uv add pyahocorasick

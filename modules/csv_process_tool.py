@@ -1,14 +1,18 @@
-import csv, os, re
+import csv, os, re, time
 from typing import Dict
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import nltk
 
-def get_valid_path(filepath_prompt, validate_func):
+def get_valid_path(filepath_prompt, validate_func, default_path=None):
     while True:
-        path = input(filepath_prompt).strip()
-        # 智能去除双引号 - 处理用户输入时可能自带的引号
-        path = path.strip('"\'')  # 去除开头和结尾的双引号和单引号
+        prompt = filepath_prompt
+        if default_path:
+            prompt = f"{filepath_prompt}上一次使用{default_path}，如继续使用请按回车，如有更换请输入地址："
+        path = input(prompt).strip()
+        if not path and default_path:
+            path = default_path
+        path = path.strip('"\'')
         is_valid, updated_path = validate_func(path)
         if is_valid:
             return updated_path
@@ -73,10 +77,6 @@ def validate_csv_file(path):
         print(f"错误：读取CSV文件时出错：{e}")
         return False, original_path
 
-nltk.data.path.append('/tmp/nltk_data')
-nltk.download('punkt', download_dir='/tmp/nltk_data')
-nltk.download('punkt_tab', download_dir='/tmp/nltk_data')
-nltk.download('wordnet', download_dir='/tmp/nltk_data')
 
 def load_terms_dict(csv_file_path: str) -> Dict[str, str]:
     terms_dict = {}
@@ -100,29 +100,151 @@ def filter_terms_dict(paragraph: str, terms_dict: Dict[str,str]) -> Dict[str, in
 
 def preprocess_text(text: str) -> str:
     lemmatizer = WordNetLemmatizer()
-    tokens = word_tokenize(text)
-    lemmatized_tokens = [lemmatizer.lemmatize(token) for token in tokens]
+    try:
+        tokens = word_tokenize(text)
+    except Exception:
+        tokens = re.findall(r"[A-Za-z]+|\d+|[^\sA-Za-z\d]", text)
+    lemmatized_tokens = []
+    for token in tokens:
+        t = token.lower()
+        if t.isalpha():
+            try:
+                r = lemmatizer.lemmatize(t, 'n')
+                if r == t:
+                    r = _to_singular(t)
+                lemmatized_tokens.append(r)
+            except Exception:
+                lemmatized_tokens.append(_to_singular(t))
+        else:
+            lemmatized_tokens.append(t)
     return ' '.join(lemmatized_tokens)
 
 def find_matching_terms(paragraph: str, terms_dict: Dict[str, str]) -> Dict[str, str]:
+    t0 = time.perf_counter()
     processed_paragraph = preprocess_text(paragraph)
-    term_patterns = {}
-    for eng_term, chi_term in terms_dict.items():
-        escaped_term = re.escape(eng_term)
-        pattern = r'\b{}\b'.format(escaped_term)
-        term_patterns[pattern] = (eng_term, chi_term)
+    lower_text = processed_paragraph.lower()
     matches = {}
-    for pattern, (eng_term, chi_term) in term_patterns.items():
-        if re.search(pattern, processed_paragraph, re.IGNORECASE):
-            matches[eng_term] = chi_term
-    for eng_term, chi_term in terms_dict.items():
-        term_words = eng_term.split()
-        if len(term_words) > 1:
-            found = True
-            for word in term_words[:-1]:
-                if word.lower() not in processed_paragraph.lower():
-                    found = False
-                    break
-            if found:
+    engine = os.getenv('CSV_MATCH_ENGINE', 'aho')
+    if engine == 'aho':
+        try:
+            import ahocorasick
+            A = ahocorasick.Automaton()
+            for eng_term, chi_term in terms_dict.items():
+                s = re.sub(r'^\s*(?:the|a|an)\s+', '', eng_term, flags=re.IGNORECASE)
+                raw_base = re.sub(r'\s+', ' ', s).strip()
+                base = raw_base.lower()
+                if not base:
+                    continue
+                A.add_word(base, (eng_term, chi_term, len(base)))
+                for art in ('the', 'a', 'an'):
+                    w = f"{art} {base}"
+                    A.add_word(w, (eng_term, chi_term, len(w)))
+            A.make_automaton()
+            for end_idx, val in A.iter(lower_text):
+                eng_term, chi_term, mlen = val
+                start_idx = end_idx - mlen + 1
+                s = start_idx
+                e = end_idx
+                prev_c = lower_text[s-1] if s > 0 else ' '
+                next_c = lower_text[e+1] if e+1 < len(lower_text) else ' '
+                if not (prev_c.isalnum() or prev_c == '_') and not (next_c.isalnum() or next_c == '_'):
+                    matches[eng_term] = chi_term
+        except Exception:
+            engine = 'regex'
+    if engine == 'regex':
+        optional_articles = r'(?:\b(?:the|a|an)\s+)?'
+        for eng_term, chi_term in terms_dict.items():
+            s = re.sub(r'^\s*(?:the|a|an)\s+', '', eng_term, flags=re.IGNORECASE)
+            base = re.sub(r'\s+', ' ', s).strip().lower()
+            if not base:
+                continue
+            escaped_base = re.escape(base)
+            pattern = rf'{optional_articles}\b{escaped_base}\b'
+            if re.search(pattern, lower_text, re.IGNORECASE):
                 matches[eng_term] = chi_term
+    if os.getenv('CSV_MATCH_FUZZY', '0') == '1':
+        try:
+            ed = int(os.getenv('CSV_MATCH_FUZZY_ED', '1'))
+        except Exception:
+            ed = 1
+        tokens = lower_text.split()
+        for eng_term, chi_term in terms_dict.items():
+            if ' ' in eng_term:
+                continue
+            if eng_term in matches:
+                continue
+            t = eng_term.lower()
+            for w in tokens:
+                if _levenshtein_leq(t, w, ed):
+                    matches[eng_term] = chi_term
+                    break
+    t1 = time.perf_counter()
+    if os.getenv('CSV_MATCH_DEBUG') == '1':
+        print(f'MATCH_TIME={t1 - t0:.6f}s MATCHES={len(matches)} TERMS={len(terms_dict)}')
     return matches
+
+def _levenshtein_leq(a: str, b: str, k: int) -> bool:
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > k:
+        return False
+    if k >= 2:
+        return _lev(a, b) <= k
+    if len(a) == len(b):
+        diff = 0
+        for i in range(len(a)):
+            if a[i] != b[i]:
+                diff += 1
+                if diff > k:
+                    return False
+        return True
+    if len(a) + 1 == len(b):
+        i = j = 0
+        diff = 0
+        while i < len(a) and j < len(b):
+            if a[i] == b[j]:
+                i += 1
+                j += 1
+            else:
+                diff += 1
+                j += 1
+                if diff > k:
+                    return False
+        return True
+    if len(b) + 1 == len(a):
+        i = j = 0
+        diff = 0
+        while i < len(a) and j < len(b):
+            if a[i] == b[j]:
+                i += 1
+                j += 1
+            else:
+                diff += 1
+                i += 1
+                if diff > k:
+                    return False
+        return True
+    return False
+
+def _lev(a: str, b: str) -> int:
+    n = len(a)
+    m = len(b)
+    dp = list(range(m + 1))
+    for i in range(1, n + 1):
+        prev = dp[0]
+        dp[0] = i
+        for j in range(1, m + 1):
+            tmp = dp[j]
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            dp[j] = min(dp[j] + 1, dp[j - 1] + 1, prev + cost)
+            prev = tmp
+    return dp[m]
+
+def _to_singular(t: str) -> str:
+    if len(t) > 3 and t.endswith('ies'):
+        return t[:-3] + 'y'
+    if len(t) > 3 and t.endswith('es') and re.search(r'(s|sh|ch|x|z)es$', t):
+        return t[:-2]
+    if len(t) > 2 and t.endswith('s') and not t.endswith('ss') and not t.endswith('us'):
+        return t[:-1]
+    return t

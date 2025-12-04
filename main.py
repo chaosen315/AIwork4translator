@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from time import perf_counter
 import csv
 load_dotenv(dotenv_path="data/.env")
-import os, time
+import os, time, json
 from modules.config import global_config, setup_runtime_config
 from modules.read_tool import read_structured_paragraphs
 from modules.csv_process_tool import get_valid_path, validate_csv_file, load_terms_dict, find_matching_terms
@@ -14,12 +14,40 @@ from modules.count_tool import count_md_words, count_structured_paragraphs
 def main():
     PS = global_config.preserve_structure
     CHUNK_SIZE = global_config.max_chunk_size
+    prefs_path = os.path.join("data", ".prefs.json")
+    prefs = {}
+    if os.path.exists(prefs_path):
+        try:
+            with open(prefs_path, "r", encoding="utf-8") as f:
+                prefs = json.load(f)
+        except Exception:
+            prefs = {}
     while True:
-        llm_service = LLMService(provider=input("""请选择需要使用的API平台（"kimi","gpt","deepseek","sillion","gemini"）:""".strip()))
-        input_file = input("请输入文件路径: ").strip()
+        default_provider = prefs.get("last_provider")
+        provider_prompt = "需要确认API平台（\"kimi\",\"gpt\",\"deepseek\",\"sillion\",\"gemini\"）。"
+        if default_provider:
+            provider_prompt += f"上一次使用{default_provider}，如继续使用请按回车，如有更换请输入："
+        else:
+            provider_prompt += ": "
+        provider_in = input(provider_prompt).strip()
+        if not provider_in and default_provider:
+            provider_in = default_provider
+        llm_service = LLMService(provider=provider_in)
+        print('')
+        default_input = prefs.get("last_input_md_file")
+        file_prompt = "需要原文文件路径。"
+        if default_input:
+            file_prompt += f"上一次使用{default_input}，如继续使用请按回车，如有更换请输入："
+        else:
+            file_prompt += ": "
+        input_file = input(file_prompt).strip()
+        if not input_file and default_input:
+            input_file = default_input
         if not input_file:
             print("输入不能为空，请重新输入。")
             continue
+        # 智能去除双引号 - 处理用户输入时可能自带的引号
+        input_file = input_file.strip('"\'')  # 去除开头和结尾的双引号和单引号
         if not os.path.exists(input_file):
             print(f"错误：文件 {input_file} 不存在，请检查路径后重试。")
             continue
@@ -56,8 +84,9 @@ def main():
     input_filename = os.path.basename(input_md_file)
     base_name, extension = os.path.splitext(input_filename)
     output_base_filename = f"{base_name}_output"
+    print('')
     output_md_file = os.path.join(input_dir, f"{output_base_filename}{extension}")
-    has_glossary = input("您是否已有名词表CSV文件？(y/n): ").strip().lower()
+    has_glossary = input("您是否已有术语表文件（csv，xlsx）？(y/n): ").strip().lower()
     if has_glossary == 'n':
         print(f'开始调取NER模型...')
         print(f'如您没有下载模型，可前往https://huggingface.co/zhayunduo/ner-bert-chinese-base下载。并将模型文件放入./models目录下。')
@@ -75,14 +104,17 @@ def main():
         print("程序将在5秒后退出...")
         time.sleep(5)
         return
-    csv_file = get_valid_path("请输入名词表CSV文件路径: ", validate_csv_file)
+    csv_file = get_valid_path("需要术语表文件地址（csv，xlsx）路径: ", validate_csv_file, prefs.get("last_csv_path"))
     start_time = perf_counter()
     terms_dict = load_terms_dict(csv_file)
     counter = 1
+    print(f"开始翻译文档...")
     while os.path.exists(output_md_file):
         output_md_file = os.path.join(input_dir, f"{output_base_filename}_{counter}{extension}")
         counter += 1
     total_paragraphs = count_structured_paragraphs(input_md_file, max_chunk_size=CHUNK_SIZE, preserve_structure=PS)
+    print(f"文档总段落数为【{total_paragraphs}】")
+    print(f"开始调取文档段落...")
     paragraphs = read_structured_paragraphs(input_md_file, max_chunk_size=CHUNK_SIZE, preserve_structure=PS)
     total_token = 0
     current_paragraph = 0
@@ -90,6 +122,7 @@ def main():
     last_api_error = None
     for segment in paragraphs:
         current_paragraph += 1
+        print(f"开始翻译段落【{current_paragraph}】/【{total_paragraphs}】")
         if PS:
             paragraph, meta_data = segment
         else:
@@ -100,6 +133,8 @@ def main():
         try:
             response, usage_tokens = llm_service.call_ai_model_api(prompt)
             print(response)
+            #response = "\n".join([response,str(specific_terms_dict),'---'])
+            response = "\n".join([response,'---'])
             consecutive_api_failures = 0
         except Exception as e:
             last_api_error = e
@@ -133,9 +168,8 @@ def main():
             write_to_markdown(output_md_file,
                               (response, meta_data),
                               mode='flat')
-        print(f"已处理一段内容，输出已保存到：")
+        print(f"已处理第{current_paragraph}段内容，输出已保存到：")
         print(output_md_file)
-        print(f"正在翻译段落【{current_paragraph}】/【{total_paragraphs}】")
     end_time = perf_counter()
     time_taken = end_time-start_time
     print(time.strftime('共耗时：%H时%M分%S秒', time.gmtime(int(time_taken))))
@@ -148,6 +182,17 @@ def main():
         if not file_exists:
             writer.writerow(['Input file','Input len','Output file','Output len','Tokens','Taken time'])
         writer.writerow(new_row)
+    new_prefs = {
+        "last_provider": provider_in,
+        "last_input_md_file": input_md_file,
+        "last_csv_path": csv_file,
+    }
+    try:
+        os.makedirs("data", exist_ok=True)
+        with open(prefs_path, "w", encoding="utf-8") as f:
+            json.dump(new_prefs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()

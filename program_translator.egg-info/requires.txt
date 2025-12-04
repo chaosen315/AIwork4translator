@@ -78,3 +78,4 @@ typing-inspection==0.4.1
 tzdata==2025.2
 urllib3==2.5.0
 google-genai>=1.52.0
+pyahocorasick>=2.2.0
