@@ -1,3 +1,4 @@
 [console_scripts]
 program-translator-cli = main:main
+program-translator-install-deps = scripts.install_dependencies:main
 program-translator-webui = app:main

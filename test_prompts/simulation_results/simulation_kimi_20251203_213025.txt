@@ -1,0 +1,80 @@
+翻译仿真测试报告
+提供商: kimi
+时间: 20251203_213025
+================================================================================
+
+样例: 样例1：基础科幻文本
+原文: Night City was once a shining beacon of technological progress, but now it's a dystopian metropolis where corporations rule and cybernetic enhancements are commonplace....
+
+段落 1:
+原文: Night City was once a shining beacon of technological progress, but now it's a dystopian metropolis ...
+译文: 夜之城曾是科技进步的璀璨灯塔，如今却沦为一座由企业统治、赛博强化已成日常的反乌托邦大都市。
+
+---
+
+【译注：
+- Night City：直接采用给定译名“夜之城”，保留原作赛博朋克氛围。
+- cy...
+格式: ❌ 不合规
+问题: 使用空行分隔，但未找到"译注"标记
+
+========================================
+
+样例: 样例2：包含专有名词
+原文: The Trauma Team arrived at the Arasaka tower where the Militech agents were holding the hostage. The corporate war between these two megacorps had escalated beyond anyone's expectations....
+
+段落 1:
+原文: The Trauma Team arrived at the Arasaka tower where the Militech agents were holding the hostage. The...
+译文: 创伤小组抵达荒坂塔时，军用科技的特工正扣押着人质；这两家巨型企业的公司战争已升级至谁都未曾预料的地步。
+
+---
+
+【译注：
+- Trauma Team：创伤小组，游戏《赛博朋克 2077》中标志性的...
+格式: ❌ 不合规
+问题: 使用空行分隔，但未找到"译注"标记
+
+========================================
+
+样例: 样例3：复杂长句
+原文: In the sprawling metropolis of Neo-Kyoto, where the neon-lit streets pulse with the rhythm of a thousand different languages and the air hangs thick with the scent of ramen and ozone, the Oni-killer k...
+
+段落 1:
+原文: In the sprawling metropolis of Neo-Kyoto, where the neon-lit streets pulse with the rhythm of a thou...
+译文: 在蔓延无际的Neo-Kyoto大都市里，霓虹灯照耀的街道随着千百种语言的节奏跳动，空气里弥漫着拉面与臭氧的味道；那位人称“鬼杀手”的Raven如幽影般穿行于暗处，她的赛博双眼扫视人群，搜寻已尾随她三天...
+格式: ❌ 不合规
+问题: 使用空行分隔，但未找到"译注"标记
+
+========================================
+
+样例: 样例4：游戏术语
+原文: The player character, a street samurai with maxed-out reflexes and a mono-filament katana, encountered a group of gangers in the Combat Zone. The DM asked for an initiative roll, and the player's d10 ...
+
+段落 1:
+原文: The player character, a street samurai with maxed-out reflexes and a mono-filament katana, encounter...
+译文: 玩家所操控的角色是一名街头武士，反射神经已强化至极限，手持单分子武士刀，在“战区”狭路撞上一伙帮派分子；地下城主宣告先攻检定，玩家掷出的十面骰亮出7点，让他在即将爆发的枪火中抢得先机。
+
+---
+
+【...
+格式: ❌ 不合规
+问题: 使用空行分隔，但未找到"译注"标记
+
+========================================
+
+样例: 样例5：混合文化元素
+原文: The korova milk bar was filled with droogs wearing the latest in moloko-plus fashion, while outside, the streets of A Clockwork Orange's dystopian London were patrolled by millicops armed with trunche...
+
+段落 1:
+原文: The korova milk bar was filled with droogs wearing the latest in moloko-plus fashion, while outside,...
+译文: 在《发条橙》的伦敦，科罗瓦奶吧里挤满了身着最新“莫洛科加强版”潮流服饰的混混；与此同时，外面的街道上，手持警棍、脾气恶劣的警察正在这座反乌托邦都市里巡逻。
+
+---
+
+【译注：
+- korova mi...
+格式: ❌ 不合规
+问题: 使用空行分隔，但未找到"译注"标记
+
+========================================
+

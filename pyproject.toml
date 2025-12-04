@@ -90,6 +90,7 @@ dependencies = [
     "tzdata==2025.2",
     "urllib3==2.5.0",
     "google-genai>=1.52.0",
+    "pyahocorasick>=2.2.0",
 ]
 
 [tool.uv]
@@ -101,3 +102,4 @@ packages = ["modules", "services"]
 [project.scripts]
 program-translator-cli = "main:main"
 program-translator-webui = "app:main"
+program-translator-install-deps = "scripts.install_dependencies:main"

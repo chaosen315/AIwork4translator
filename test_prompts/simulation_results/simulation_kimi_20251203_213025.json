@@ -1,0 +1,143 @@
+{
+  "provider": "kimi",
+  "timestamp": "20251203_213025",
+  "summary": {
+    "total_samples": 5,
+    "total_segments": 5,
+    "successful_segments": 5,
+    "format_compliant_segments": 0,
+    "total_tokens": 2805
+  },
+  "results": [
+    {
+      "sample_id": 1,
+      "title": "样例1：基础科幻文本",
+      "original_text": "Night City was once a shining beacon of technological progress, but now it's a dystopian metropolis where corporations rule and cybernetic enhancements are commonplace.",
+      "segments": [
+        {
+          "segment_id": 1,
+          "original": "Night City was once a shining beacon of technological progress, but now it's a dystopian metropolis where corporations rule and cybernetic enhancements are commonplace.",
+          "translation": "夜之城曾是科技进步的璀璨灯塔，如今却沦为一座由企业统治、赛博强化已成日常的反乌托邦大都市。\n\n---\n\n【译注：\n- Night City：直接采用给定译名“夜之城”，保留原作赛博朋克氛围。\n- cybernetic：按给定译名“赛博的”处理，指代与赛博格技术相关的增强装置。\n- metropolis：采用给定译名“大都市”，突出其超大规模城市特征。\n- corporations：虽为普通英文词汇，但在赛博朋克语境中常指“巨型企业”，此处译为“企业”以贴合中文习惯。\n- dystopian：未在给定术语表中出现，译为“反乌托邦”系通用译法，保留英文原词“dystopian”的典故出处（源自希腊语“dys-”与“topos”，意指“坏地方”）。\n】",
+          "tokens": 534,
+          "format_analysis": {
+            "has_main_text": true,
+            "has_footnotes": true,
+            "format_correct": false,
+            "main_text": "夜之城曾是科技进步的璀璨灯塔，如今却沦为一座由企业统治、赛博强化已成日常的反乌托邦大都市。",
+            "footnotes": "---\n\n【译注：\n- Night City：直接采用给定译名“夜之城”，保留原作赛博朋克氛围。\n- cybernetic：按给定译名“赛博的”处理，指代与赛博格技术相关的增强装置。\n- metropolis：采用给定译名“大都市”，突出其超大规模城市特征。\n- corporations：虽为普通英文词汇，但在赛博朋克语境中常指“巨型企业”，此处译为“企业”以贴合中文习惯。\n- dystopian：未在给定术语表中出现，译为“反乌托邦”系通用译法，保留英文原词“dystopian”的典故出处（源自希腊语“dys-”与“topos”，意指“坏地方”）。\n】",
+            "issues": [
+              "使用空行分隔，但未找到\"译注\"标记"
+            ]
+          },
+          "success": true
+        }
+      ],
+      "total_segments": 1,
+      "successful_segments": 1
+    },
+    {
+      "sample_id": 2,
+      "title": "样例2：包含专有名词",
+      "original_text": "The Trauma Team arrived at the Arasaka tower where the Militech agents were holding the hostage. The corporate war between these two megacorps had escalated beyond anyone's expectations.",
+      "segments": [
+        {
+          "segment_id": 1,
+          "original": "The Trauma Team arrived at the Arasaka tower where the Militech agents were holding the hostage. The corporate war between these two megacorps had escalated beyond anyone's expectations.",
+          "translation": "创伤小组抵达荒坂塔时，军用科技的特工正扣押着人质；这两家巨型企业的公司战争已升级至谁都未曾预料的地步。\n\n---\n\n【译注：\n- Trauma Team：创伤小组，游戏《赛博朋克 2077》中标志性的高端医疗急救服务品牌，中文官方译名。\n- Arasaka tower：荒坂塔，荒坂公司总部大楼，系列作品中固定译法。\n- Militech：军用科技，系列官方中文设定集与游戏内文本统一译名。\n- megacorps：mega-corporations 的缩写，意为“巨型企业”，此处保留原词风格译为“巨型企业”。】",
+          "tokens": 497,
+          "format_analysis": {
+            "has_main_text": true,
+            "has_footnotes": true,
+            "format_correct": false,
+            "main_text": "创伤小组抵达荒坂塔时，军用科技的特工正扣押着人质；这两家巨型企业的公司战争已升级至谁都未曾预料的地步。",
+            "footnotes": "---\n\n【译注：\n- Trauma Team：创伤小组，游戏《赛博朋克 2077》中标志性的高端医疗急救服务品牌，中文官方译名。\n- Arasaka tower：荒坂塔，荒坂公司总部大楼，系列作品中固定译法。\n- Militech：军用科技，系列官方中文设定集与游戏内文本统一译名。\n- megacorps：mega-corporations 的缩写，意为“巨型企业”，此处保留原词风格译为“巨型企业”。】",
+            "issues": [
+              "使用空行分隔，但未找到\"译注\"标记"
+            ]
+          },
+          "success": true
+        }
+      ],
+      "total_segments": 1,
+      "successful_segments": 1
+    },
+    {
+      "sample_id": 3,
+      "title": "样例3：复杂长句",
+      "original_text": "In the sprawling metropolis of Neo-Kyoto, where the neon-lit streets pulse with the rhythm of a thousand different languages and the air hangs thick with the scent of ramen and ozone, the Oni-killer known only as Raven moved through the shadows like a ghost, her cybernetic eyes scanning the crowds for any sign of the Yakuza hit squad that had been trailing her for three days.",
+      "segments": [
+        {
+          "segment_id": 1,
+          "original": "In the sprawling metropolis of Neo-Kyoto, where the neon-lit streets pulse with the rhythm of a thousand different languages and the air hangs thick with the scent of ramen and ozone, the Oni-killer known only as Raven moved through the shadows like a ghost, her cybernetic eyes scanning the crowds for any sign of the Yakuza hit squad that had been trailing her for three days.",
+          "translation": "在蔓延无际的Neo-Kyoto大都市里，霓虹灯照耀的街道随着千百种语言的节奏跳动，空气里弥漫着拉面与臭氧的味道；那位人称“鬼杀手”的Raven如幽影般穿行于暗处，她的赛博双眼扫视人群，搜寻已尾随她三天的黑帮刺杀小组的蛛丝马迹。\n\n---\n\n【译注：\n- Neo-Kyoto：合成地名，由“Neo-”（新）与“Kyoto”（京都）组成，暗示近未来或架空日本首都，保留英文以维持虚构感。\n- Oni-killer：字面意为“鬼杀手”，在句中作为称号出现，意指专门猎杀“鬼”或极恶之人的传奇角色，故直译并加引号。\n- Raven：角色名，意为“渡鸦”，在英语语境中常与神秘、死亡预兆关联，保留英文以保留人名原意与音韵。\n】",
+          "tokens": 605,
+          "format_analysis": {
+            "has_main_text": true,
+            "has_footnotes": true,
+            "format_correct": false,
+            "main_text": "在蔓延无际的Neo-Kyoto大都市里，霓虹灯照耀的街道随着千百种语言的节奏跳动，空气里弥漫着拉面与臭氧的味道；那位人称“鬼杀手”的Raven如幽影般穿行于暗处，她的赛博双眼扫视人群，搜寻已尾随她三天的黑帮刺杀小组的蛛丝马迹。",
+            "footnotes": "---\n\n【译注：\n- Neo-Kyoto：合成地名，由“Neo-”（新）与“Kyoto”（京都）组成，暗示近未来或架空日本首都，保留英文以维持虚构感。\n- Oni-killer：字面意为“鬼杀手”，在句中作为称号出现，意指专门猎杀“鬼”或极恶之人的传奇角色，故直译并加引号。\n- Raven：角色名，意为“渡鸦”，在英语语境中常与神秘、死亡预兆关联，保留英文以保留人名原意与音韵。\n】",
+            "issues": [
+              "使用空行分隔，但未找到\"译注\"标记"
+            ]
+          },
+          "success": true
+        }
+      ],
+      "total_segments": 1,
+      "successful_segments": 1
+    },
+    {
+      "sample_id": 4,
+      "title": "样例4：游戏术语",
+      "original_text": "The player character, a street samurai with maxed-out reflexes and a mono-filament katana, encountered a group of gangers in the Combat Zone. The DM asked for an initiative roll, and the player's d10 came up 7, giving him the edge in the upcoming firefight.",
+      "segments": [
+        {
+          "segment_id": 1,
+          "original": "The player character, a street samurai with maxed-out reflexes and a mono-filament katana, encountered a group of gangers in the Combat Zone. The DM asked for an initiative roll, and the player's d10 came up 7, giving him the edge in the upcoming firefight.",
+          "translation": "玩家所操控的角色是一名街头武士，反射神经已强化至极限，手持单分子武士刀，在“战区”狭路撞上一伙帮派分子；地下城主宣告先攻检定，玩家掷出的十面骰亮出7点，让他在即将爆发的枪火中抢得先机。\n\n---\n\n【译注：\n- 街头武士（street samurai）：赛博朋克设定中靠义体与刀械混饭吃的雇佣兵，直译保留“武士”意象。\n- 单分子武士刀（mono-filament katana）：刀刃刃口为单分子级细丝，极致锋利；katana已统一为“武士刀”。\n- 战区（Combat Zone）：原文大写，视为特定地名/区域名，意译突出其高危属性。\n- 帮派分子（gangers）：ganger为“gang member”的俚语缩写，统一作“帮派分子”。\n- 地下城主（DM）：Dungeon Master的缩写，桌面角色扮演游戏的主持者，业内通译“地下城主”。\n- 先攻检定（initiative roll）：判定行动顺序的游戏机制，沿用通用译名“先攻”。\n- 十面骰（d10）：十面骰子，TRPG常用骰型，保留“d10”符号并在前文补述“十面骰”。\n】",
+          "tokens": 655,
+          "format_analysis": {
+            "has_main_text": true,
+            "has_footnotes": true,
+            "format_correct": false,
+            "main_text": "玩家所操控的角色是一名街头武士，反射神经已强化至极限，手持单分子武士刀，在“战区”狭路撞上一伙帮派分子；地下城主宣告先攻检定，玩家掷出的十面骰亮出7点，让他在即将爆发的枪火中抢得先机。",
+            "footnotes": "---\n\n【译注：\n- 街头武士（street samurai）：赛博朋克设定中靠义体与刀械混饭吃的雇佣兵，直译保留“武士”意象。\n- 单分子武士刀（mono-filament katana）：刀刃刃口为单分子级细丝，极致锋利；katana已统一为“武士刀”。\n- 战区（Combat Zone）：原文大写，视为特定地名/区域名，意译突出其高危属性。\n- 帮派分子（gangers）：ganger为“gang member”的俚语缩写，统一作“帮派分子”。\n- 地下城主（DM）：Dungeon Master的缩写，桌面角色扮演游戏的主持者，业内通译“地下城主”。\n- 先攻检定（initiative roll）：判定行动顺序的游戏机制，沿用通用译名“先攻”。\n- 十面骰（d10）：十面骰子，TRPG常用骰型，保留“d10”符号并在前文补述“十面骰”。\n】",
+            "issues": [
+              "使用空行分隔，但未找到\"译注\"标记"
+            ]
+          },
+          "success": true
+        }
+      ],
+      "total_segments": 1,
+      "successful_segments": 1
+    },
+    {
+      "sample_id": 5,
+      "title": "样例5：混合文化元素",
+      "original_text": "The korova milk bar was filled with droogs wearing the latest in moloko-plus fashion, while outside, the streets of A Clockwork Orange's dystopian London were patrolled by millicops armed with truncheons and bad attitudes.",
+      "segments": [
+        {
+          "segment_id": 1,
+          "original": "The korova milk bar was filled with droogs wearing the latest in moloko-plus fashion, while outside, the streets of A Clockwork Orange's dystopian London were patrolled by millicops armed with truncheons and bad attitudes.",
+          "translation": "在《发条橙》的伦敦，科罗瓦奶吧里挤满了身着最新“莫洛科加强版”潮流服饰的混混；与此同时，外面的街道上，手持警棍、脾气恶劣的警察正在这座反乌托邦都市里巡逻。\n\n---\n\n【译注：\n- korova milk bar：保留“科罗瓦奶吧”，因“korova”为俄语“корова”（母牛）的音译，原文借此营造异域感，中文音译可保留其异质氛围。\n- A Clockwork Orange：通译《发条橙》，为安东尼·伯吉斯原著及库布里克电影的经典译名，沿用既定通行译法。\n】",
+          "tokens": 514,
+          "format_analysis": {
+            "has_main_text": true,
+            "has_footnotes": true,
+            "format_correct": false,
+            "main_text": "在《发条橙》的伦敦，科罗瓦奶吧里挤满了身着最新“莫洛科加强版”潮流服饰的混混；与此同时，外面的街道上，手持警棍、脾气恶劣的警察正在这座反乌托邦都市里巡逻。",
+            "footnotes": "---\n\n【译注：\n- korova milk bar：保留“科罗瓦奶吧”，因“korova”为俄语“корова”（母牛）的音译，原文借此营造异域感，中文音译可保留其异质氛围。\n- A Clockwork Orange：通译《发条橙》，为安东尼·伯吉斯原著及库布里克电影的经典译名，沿用既定通行译法。\n】",
+            "issues": [
+              "使用空行分隔，但未找到\"译注\"标记"
+            ]
+          },
+          "success": true
+        }
+      ],
+      "total_segments": 1,
+      "successful_segments": 1
+    }
+  ]
+}
