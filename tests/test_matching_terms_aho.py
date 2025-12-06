@@ -62,3 +62,25 @@ def test_aho_multiple_occurrences_collapsed():
 def test_aho_fuzzy_off_by_default():
     terms = {"priority": "优先级"}
     assert find_matching_terms("We discussed prioritx today.", terms) == {}
+
+
+def test_aho_proper_noun_upper_to_lower():
+    terms = {"HOPKINS": "霍普金斯"}
+    assert find_matching_terms("Hopkins was present.", terms) == {"HOPKINS": "霍普金斯"}
+
+
+def test_aho_proper_noun_lower_to_upper():
+    terms = {"Hopkins": "霍普金斯"}
+    assert find_matching_terms("HOPKINS arrived.", terms) == {"Hopkins": "霍普金斯"}
+
+
+def test_aho_proper_noun_punctuation_boundary():
+    terms = {"HOPKINS": "霍普金斯"}
+    assert find_matching_terms("We talked to Hopkins, and left.", terms) == {"HOPKINS": "霍普金斯"}
+
+
+def test_aho_proper_noun_duplicate_keys_collapsed():
+    terms = {"HOPKINS": "霍普金斯", "Hopkins": "霍普金斯"}
+    res = find_matching_terms("We met Hopkins in the lobby.", terms)
+    assert len(res) == 1
+    assert list(res.values())[0] == "霍普金斯"

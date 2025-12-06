@@ -91,33 +91,27 @@ def load_terms_dict(csv_file_path: str) -> Dict[str, str]:
                     terms_dict[eng_term] = chi_term
     return terms_dict
 
-def filter_terms_dict(paragraph: str, terms_dict: Dict[str,str]) -> Dict[str, int]:
-    return {
-        term: trans
-        for term, trans in terms_dict.items()
-        if term.lower() in paragraph.lower()
-    }
-
 def preprocess_text(text: str) -> str:
     lemmatizer = WordNetLemmatizer()
     try:
         tokens = word_tokenize(text)
     except Exception:
         tokens = re.findall(r"[A-Za-z]+|\d+|[^\sA-Za-z\d]", text)
-    lemmatized_tokens = []
+    out_tokens = []
     for token in tokens:
-        t = token.lower()
-        if t.isalpha():
+        lower = token.lower()
+        if lower.isalpha():
+            if token.isupper() or token[0].isupper():
+                out_tokens.append(lower)
+                continue
             try:
-                r = lemmatizer.lemmatize(t, 'n')
-                if r == t:
-                    r = _to_singular(t)
-                lemmatized_tokens.append(r)
+                r = lemmatizer.lemmatize(lower, 'n')
+                out_tokens.append(r)
             except Exception:
-                lemmatized_tokens.append(_to_singular(t))
+                out_tokens.append(lower)
         else:
-            lemmatized_tokens.append(t)
-    return ' '.join(lemmatized_tokens)
+            out_tokens.append(lower)
+    return ' '.join(out_tokens)
 
 def find_matching_terms(paragraph: str, terms_dict: Dict[str, str]) -> Dict[str, str]:
     t0 = time.perf_counter()

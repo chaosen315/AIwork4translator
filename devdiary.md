@@ -193,8 +193,71 @@
 - 模块统一：`modules/api_tool.py`、`modules/config.py`、`modules/write_out_tool.py`、`modules/ner_list_tool.py`、`modules/read_tool.py`、`modules/count_tool.py`、`modules/csv_process_tool.py`、`modules/markitdown_tool.py`
 - 脚本：`pyproject.toml` 更新脚本入口；`data/README.md` 更新根结构与使用说明。
 
+### 2025/12/04 - 提示词双段式输出与仿真测试工具
+- **文件修改**：`data/.env`（提示词优化）
+- **新增文件**：
+  - `test_prompts/test_samples.md`（多类型英文样例，用于提示词验证）
+  - `test_prompts/test_terms.csv`（术语词典示例）
+
+### 2025/12/06 - 段落重试、术语合并开关与专有名匹配优化
+- **文件修改**：
+  - `main.py`
+  - `modules/csv_process_tool.py`
+  - `tests/test_matching_terms_aho.py`
+- **主要更新**：
+  - 段落级 API 重试：在 `main.py:130-169` 引入循环重试当前段落，捕获异常并累计 `consecutive_api_failures`，当达到 `MAX_RETRIES` 后触发 API 配置测试并退出；成功调用后重置失败计数。
+  - 术语合并开关与并集匹配：在 `main.py:113-116` 新增是否合并新术语的交互开关；在 `main.py:137-145` 使用 CSV 术语与运行中收集的新术语的并集 `union_terms_dict` 进行段落匹配；结束时按选择进行合并保存或将“新术语”单独保存（`main.py:198-203`）。
+  - 专有名匹配优化：在 `modules/csv_process_tool.py:98-113` 优化 `preprocess_text`，对全大写或首字母大写的词不进行单数化与形态归一，仅做小写标准化，从而解决如 `HOPKINS` ↔ `Hopkins` 在后续段落的匹配问题。
+  - 测试用例补充：在 `tests/test_matching_terms_aho.py` 增加针对专有名的大小写匹配、标点边界与重复键折叠的测试用例，覆盖 `Hopkins/HOPKINS` 的常见场景。
+- **验证与结果**：
+  - 新增测试已就绪，运行命令：`python -m pytest -q`。
+  - 若本地缺少相关依赖（如 `ahocorasick` 或 NLTK 资源）导致测试失败，可将环境变量 `CSV_MATCH_ENGINE` 设置为 `regex` 进行验证，或按需安装依赖。
+  - `test_prompts/test_prompts.py`（早期测试脚本）
+  - `test_prompts/simulator.py`（仿真测试程序，直接调用 `modules` 工具链）
+- **主要更新**：
+  1. 提示词输出格式规范化：在 `SYSTEM_PROMPT` 与 `BASE_PROMPT` 中明确规定译文必须分为上下两段，第一段为正文，第二段为“译注”列表；两段之间以单个换行分隔；“译注”需以列表形式给出新术语的翻译理由与可能典故（参考 `data/.env:7-10`）。
+  2. 强化术语处理：正文严格使用词典中的译名；对词典未覆盖的新术语，正文保留英文并在“译注”中说明译名依据与来源。
+  3. 仿真测试工具：新增 `simulator.py`，复刻真实 CLI 流程，直接使用 `LLMService.create_prompt` 与 `LLMService.call_ai_model_api` 调用模型，结合 `csv_process_tool.find_matching_terms` 进行术语匹配，并依据 `global_config.max_chunk_size` 进行段落切分与逐段测试；内置格式合规分析，检测“译注：”分隔与列表格式是否满足要求。
+- **使用说明**：
+  - 运行仿真：`python test_prompts\simulator.py --provider kimi`
+  - 结果输出：`test_prompts/simulation_results/simulation_<provider>_<timestamp>.json|.txt`
+- **验证要点**：
+  - 检查译文是否包含“正文”与“译注”两段，且“译注”开头包含“译注：”标识并以列表呈现。
+  - 统计格式合规率、段落成功率与tokens消耗，辅助提示词迭代。
+- 关键调用参考：`modules/api_tool.py:LLMService.create_prompt` 与 `LLMService.call_ai_model_api`；术语匹配参考：`modules/csv_process_tool.py:find_matching_terms`。
+
+### 2025/12/04 - 名词表XLSX转换与验证优化
+- 文件修改：`modules/csv_process_tool.py`、`app.py`、`main.py`
+- 主要更新：
+  - `validate_csv_file` 支持 `.xlsx` 自动转换为 `.csv`，返回 `(is_valid, updated_path)`，并在转换后继续进行两列非空校验（`modules/csv_process_tool.py:21`、`modules/csv_process_tool.py:75`）。
+  - `get_valid_path` 适配新返回值，直接返回转换后的有效路径（`modules/csv_process_tool.py:7-19`）。
+  - Web 端 `/validate-file` 接口接入新签名并在转换后更新 `file_path`（`app.py:110-119`）。
+  - CLI 端通过 `get_valid_path("请输入名词表CSV文件路径: ", validate_csv_file)` 获取转换后的路径，无需额外改动（`main.py:78-82`）。
+- 依赖与实现：
+  - 使用 `pandas` 进行 XLSX 读取与 CSV 写出，项目依赖已包含（`requirements.txt:56`）。
+  - 转换产物命名为 `<原名>_converted.csv`，编码 `utf-8-sig`，列名规范化为 `term, definition`。
+- 验证与结果：
+  - 运行 `python -m pytest -k xlsx -q`，结果：`2 passed, 35 deselected`，耗时约 16.27s（Terminal#607-610）。
+- 注意事项：
+  - CSV 校验严格要求两列且非空；若 XLSX 列数不满足要求则拒绝并不产生转换文件。
+  - Web 端验证返回的路径为转换后的 CSV 绝对路径，后续处理统一以该路径为准。
+
+### 2025/12/04 - CLI偏好持久化与交互预填充
+- 文件修改：`main.py`、`modules/csv_process_tool.py`
+- 主要更新：
+  - 在 CLI 中新增偏好持久化，记录上次使用的 API 平台与文件路径，写入 `data/.prefs.json`（`main.py:182-192`）。
+  - 启动时读取偏好作为默认值，输入提示以 `[...]` 形式预填充，支持直接回车沿用（`main.py:17-24`、`main.py:26-45`、`main.py:105`）。
+  - 路径输入函数支持默认值与重试，兼容引号剥离与转换后路径返回（`modules/csv_process_tool.py:7-19`）。
+- 测试与验证：
+  - 单元测试：`tests/test_get_valid_path.py`（默认值、引号剥离、重试逻辑），`tests/test_validate_csv_file.py`（有效 CSV、不合规列、空单元格）。
+  - 集成测试：`tests/test_main_prefs_integration.py` 验证首次运行写入偏好、二次运行沿用默认值，替换 `LLMService` 与 I/O 链路确保可控。
+  - 结果：在 `.venv` 下运行 `python -m pytest -q` 全部通过；单测与集测独立运行均通过。
+- 使用说明：
+  - 偏好文件位于 `data/.prefs.json`（隐藏文件名，资源管理器需启用隐藏文件显示或使用 `Get-ChildItem data -Force`）。
+  - 若流程在转换确认阶段选择 `n` 或异常提前退出，则偏好不会写入；需要完成一次正文翻译流程以生成偏好文件。
+
 ## 最后更新时间
-2025/11/29
+2025/12/04
 
 ## 项目结构概览（合并后）
 
