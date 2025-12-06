@@ -85,6 +85,7 @@ class TranslationSimulator:
         print(f"分割为 {len(segments)} 个段落")
         
         segment_results = []
+        aggregated_new_terms = []
         
         for seg_idx, segment in enumerate(segments, 1):
             print(f"\n📄 翻译段落 {seg_idx}/{len(segments)}")
@@ -99,26 +100,38 @@ class TranslationSimulator:
             
             # 调用API
             try:
-                response, tokens = self.llm_service.call_ai_model_api(prompt)
+                response_obj, tokens = self.llm_service.call_ai_model_api(prompt)
+                print(type(response_obj))
+                print(response_obj)
                 self.total_tokens += tokens
                 self.successful_segments += 1
-                
+
+                translation = response_obj.get('translation', '')
+                notes = response_obj.get('notes', '')
+                print(type(notes))
+                new_terms = response_obj.get('newterminology', [])
+                aggregated_new_terms.extend(new_terms)
+                joined = "\n\n---\n\n".join([translation, notes])
+
                 print(f"✅ 翻译成功 (tokens: {tokens})")
-                
+
                 # 分析输出格式
-                format_analysis = self._analyze_output_format(response)
-                
+                format_analysis = self._analyze_output_format(joined)
+
                 segment_results.append({
                     'segment_id': seg_idx,
                     'original': segment,
-                    'translation': response,
+                    'translation_joined': joined,
+                    'translation': translation,
+                    'notes': notes,
+                    'newterminology': new_terms,
                     'tokens': tokens,
                     'format_analysis': format_analysis,
                     'success': True
                 })
-                
+
                 # 显示结果预览
-                self._display_translation_preview(response, format_analysis)
+                self._display_translation_preview(joined, format_analysis)
                 
             except Exception as e:
                 print(f"❌ 翻译失败: {str(e)}")
@@ -140,7 +153,8 @@ class TranslationSimulator:
             'original_text': text,
             'segments': segment_results,
             'total_segments': len(segments),
-            'successful_segments': sum(1 for seg in segment_results if seg['success'])
+            'successful_segments': sum(1 for seg in segment_results if seg['success']),
+            'new_terms_total': len(aggregated_new_terms)
         }
     
     def _split_into_segments(self, text: str) -> List[str]:
@@ -186,8 +200,7 @@ class TranslationSimulator:
         
         return segments
     
-    def _analyze_output_format(self, translation: str) -> Dict:
-        """分析输出格式是否符合双段式要求"""
+    def _analyze_output_format(self, joined_text: str) -> Dict:
         analysis = {
             'has_main_text': False,
             'has_footnotes': False,
@@ -196,51 +209,39 @@ class TranslationSimulator:
             'footnotes': '',
             'issues': []
         }
-        
-        if not translation:
+        if not joined_text:
             analysis['issues'].append('翻译结果为空')
             return analysis
-        
-        lines = translation.strip().split('\n')
-        
-        # 查找译注分隔点
-        footnote_start = -1
-        for i, line in enumerate(lines):
-            if line.startswith('译注：') or line.startswith('译注:'):
-                footnote_start = i
-                break
-        
-        if footnote_start != -1:
-            # 找到译注标记
-            analysis['main_text'] = '\n'.join(lines[:footnote_start]).strip()
-            analysis['footnotes'] = '\n'.join(lines[footnote_start:]).strip()
-            analysis['has_main_text'] = bool(analysis['main_text'])
-            analysis['has_footnotes'] = bool(analysis['footnotes'])
-            analysis['format_correct'] = True
+        text = joined_text.replace('\r\n', '\n').strip()
+        parts = None
+        if '\n\n---\n\n' in text:
+            parts = text.split('\n\n---\n\n', 1)
+        elif '\n---\n' in text:
+            parts = text.split('\n---\n', 1)
         else:
-            # 尝试按空行分割
-            empty_line_idx = -1
+            lines = text.split('\n')
+            sep_idx = -1
             for i, line in enumerate(lines):
-                if line.strip() == '':
-                    empty_line_idx = i
+                if line.strip() == '---':
+                    sep_idx = i
                     break
-            
-            if empty_line_idx != -1:
-                analysis['main_text'] = '\n'.join(lines[:empty_line_idx]).strip()
-                analysis['footnotes'] = '\n'.join(lines[empty_line_idx+1:]).strip()
-                analysis['has_main_text'] = bool(analysis['main_text'])
-                analysis['has_footnotes'] = bool(analysis['footnotes'])
-                
-                if analysis['has_footnotes']:
-                    analysis['issues'].append('使用空行分隔，但未找到"译注"标记')
-                else:
-                    analysis['issues'].append('未找到译注部分')
-            else:
-                # 完全没有分隔
-                analysis['main_text'] = translation.strip()
-                analysis['has_main_text'] = True
-                analysis['issues'].append('未找到任何分隔，只有正文')
-        
+            if sep_idx != -1:
+                parts = ['\n'.join(lines[:sep_idx]), '\n'.join(lines[sep_idx+1:])]
+        if parts:
+            main_text = parts[0].strip()
+            footnotes = parts[1].strip()
+            analysis['main_text'] = main_text
+            analysis['footnotes'] = footnotes
+            analysis['has_main_text'] = bool(main_text)
+            analysis['has_footnotes'] = bool(footnotes)
+            bullet = any(l.strip().startswith('-') for l in footnotes.splitlines())
+            analysis['format_correct'] = analysis['has_main_text'] and analysis['has_footnotes'] and bullet
+            if not bullet:
+                analysis['issues'].append('译注未使用列表格式')
+        else:
+            analysis['main_text'] = text
+            analysis['has_main_text'] = True
+            analysis['issues'].append('未找到分隔符 ---')
         return analysis
     
     def _display_translation_preview(self, translation: str, format_analysis: Dict):
@@ -397,7 +398,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='翻译提示词仿真测试工具')
     parser.add_argument('--provider', default='kimi', 
-                       choices=['kimi', 'deepseek', 'gpt', 'sillion', 'gemini', 'doubao'],
+                       choices=['kimi', 'deepseek', 'gpt', 'sillicon', 'gemini', 'doubao'],
                        help='选择LLM提供商')
     parser.add_argument('--sample', type=int, help='只测试指定编号的样例')
     

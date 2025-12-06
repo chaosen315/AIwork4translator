@@ -6,6 +6,7 @@ import os, time, json
 from modules.config import global_config, setup_runtime_config
 from modules.read_tool import read_structured_paragraphs
 from modules.csv_process_tool import get_valid_path, validate_csv_file, load_terms_dict, find_matching_terms
+from modules.terminology_tool import load_glossary_df, merge_new_terms, save_glossary_df, dict_to_df
 from modules.api_tool import LLMService
 from modules.write_out_tool import write_to_markdown
 from modules.markitdown_tool import markitdown_tool
@@ -107,6 +108,11 @@ def main():
     csv_file = get_valid_path("需要术语表文件地址（csv，xlsx）路径: ", validate_csv_file, prefs.get("last_csv_path"))
     start_time = perf_counter()
     terms_dict = load_terms_dict(csv_file)
+    glossary_df = load_glossary_df(csv_file)
+    aggregated_new_terms = []
+    merge_choice = input("是否将新术语合并到术语表？(y/n): ").strip().lower()
+    merge_in_place = (merge_choice == 'y')
+    new_terms_df = None
     counter = 1
     print(f"开始翻译文档...")
     while os.path.exists(output_md_file):
@@ -128,35 +134,47 @@ def main():
         else:
             paragraph = segment
             meta_data = None
-        specific_terms_dict = find_matching_terms(paragraph, terms_dict)
+        union_terms_dict = terms_dict.copy()
+        if aggregated_new_terms:
+            for nt in aggregated_new_terms:
+                k = str(nt.get('term', '')).strip()
+                v = str(nt.get('translation', '')).strip()
+                if k and k not in union_terms_dict:
+                    union_terms_dict[k] = v
+        specific_terms_dict = find_matching_terms(paragraph, union_terms_dict)
         prompt = llm_service.create_prompt(paragraph, specific_terms_dict)
-        try:
-            response, usage_tokens = llm_service.call_ai_model_api(prompt)
-            print(response)
-            #response = "\n".join([response,str(specific_terms_dict),'---'])
-            response = "\n".join([response,'---'])
-            consecutive_api_failures = 0
-        except Exception as e:
-            last_api_error = e
-            consecutive_api_failures += 1
-            print(f"\nAPI调用失败：{str(e)}")
-            print(f"连续翻译失败次数: {consecutive_api_failures}/3")
-            if consecutive_api_failures >= 3:
-                print("\n连续3次翻译失败，开始进行API配置测试...")
-                try:
-                    test_results = llm_service.test_api()
-                    print("\n=== API测试完成 ===")
-                    print(f"测试结果: {test_results}")
-                    print(f"最后一次API调用错误: {str(last_api_error)}")
-                    print(f"\n请检查API配置或网络连接后重新运行程序。")
-                    print("配置文件位置: data/.env")
-                except Exception as test_e:
-                    print(f"\nAPI测试过程中发生错误: {str(test_e)}")
-                    print(f"最后一次API调用错误: {str(last_api_error)}")
-                    print("\n请检查API配置或网络连接后重新运行程序。")
-                    print("配置文件位置: data/.env")
-                return
-            continue
+        while True:
+            try:
+                response_obj, usage_tokens = llm_service.call_ai_model_api(prompt)
+                translation = response_obj.get('translation', '')
+                notes = response_obj.get('notes', '')
+                new_terms = response_obj.get('newterminology', [])
+                aggregated_new_terms.extend(new_terms)
+                response = "\n\n---\n\n".join([translation, notes])
+                print(response)
+                consecutive_api_failures = 0
+                break
+            except Exception as e:
+                last_api_error = e
+                consecutive_api_failures += 1
+                print(f"\nAPI调用失败：{str(e)}")
+                print(f"连续翻译失败次数: {consecutive_api_failures}/{os.getenv('MAX_RETRIES', 3)}")
+                if consecutive_api_failures >= int(os.getenv('MAX_RETRIES', 3)):
+                    print("\n连续3次翻译失败，开始进行API配置测试...")
+                    try:
+                        test_results = llm_service.test_api()
+                        print("\n=== API测试完成 ===")
+                        print(f"测试结果: {test_results}")
+                        print(f"最后一次API调用错误: {str(last_api_error)}")
+                        print(f"\n请检查API配置或网络连接后重新运行程序。")
+                        print("配置文件位置: data/.env")
+                    except Exception as test_e:
+                        print(f"\nAPI测试过程中发生错误: {str(test_e)}")
+                        print(f"最后一次API调用错误: {str(last_api_error)}")
+                        print("\n请检查API配置或网络连接后重新运行程序。")
+                        print("配置文件位置: data/.env")
+                    return
+                print("正在重试当前段落...")
         total_token += usage_tokens
         if PS:
             write_to_markdown(
@@ -165,9 +183,11 @@ def main():
                 mode='structured'
             )
         else:
-            write_to_markdown(output_md_file,
-                              (response, meta_data),
-                              mode='flat')
+            write_to_markdown(
+                output_md_file,
+                (response, meta_data),
+                mode='flat'
+            )
         print(f"已处理第{current_paragraph}段内容，输出已保存到：")
         print(output_md_file)
     end_time = perf_counter()
@@ -175,6 +195,14 @@ def main():
     print(time.strftime('共耗时：%H时%M分%S秒', time.gmtime(int(time_taken))))
     raw_len = count_md_words(input_md_file)
     processed_len = count_md_words(output_md_file)
+    if merge_in_place:
+        merged_glossary = merge_new_terms(glossary_df, aggregated_new_terms)
+        new_glossary_path = save_glossary_df(merged_glossary, csv_file)
+    else:
+        new_terms_df = dict_to_df(aggregated_new_terms)
+        new_glossary_path = save_glossary_df(new_terms_df, csv_file)
+    print("新的术语表已保存：")
+    print(new_glossary_path)
     new_row = [str(input_md_file),raw_len,str(output_md_file),processed_len,total_token,time_taken]
     file_exists = os.path.isfile('counting_table.csv') and os.path.getsize('counting_table.csv') > 0
     with open('counting_table.csv','a',newline='',encoding='utf-8') as csvfile:
