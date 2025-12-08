@@ -38,11 +38,11 @@ def validate_csv_file(path):
             converted_path = path.rsplit('.', 1)[0] + '_converted.csv'
             df = pd.read_excel(path)
             # Ensure the DataFrame has exactly 2 columns
-            if len(df.columns) <= 2:
+            if len(df.columns) <= 1:
                 print(f"错误：XLSX文件必须至少包含两列，当前有{len(df.columns)}列")
                 return False, original_path
             # Rename columns to ensure consistent naming
-            df.columns = ['term', 'definition']
+            df.columns = ['term', 'translation'] + df.columns[2:].tolist()
             df.to_csv(converted_path, index=False, encoding='utf-8-sig')
             print(f"成功：XLSX文件已转换为CSV格式：{converted_path}")
             # Update path to use the converted CSV file
@@ -58,14 +58,14 @@ def validate_csv_file(path):
         with open(path, 'r', encoding='utf-8-sig') as f:
             csv_reader = csv.reader(f)
             headers = next(csv_reader, None)
-            if headers is None or len(headers) != 2:
-                print("错误：CSV文件必须包含两列")
+            if headers is None or len(headers) < 2:
+                print("错误：CSV文件必须包含至少两列")
                 return False, original_path
             for row_num, row in enumerate(csv_reader, start=2):
-                if len(row) != 2:
-                    print(f"错误：第 {row_num} 行列数不等于2")
+                if len(row) < 2:
+                    print(f"错误：第 {row_num} 行列数小于2")
                     return False, original_path
-                term, definition = row
+                term, definition = row[:2]
                 if not term.strip():
                     print(f"错误：第 {row_num} 行第一列（术语）为空")
                     return False, original_path
@@ -130,6 +130,23 @@ def find_matching_terms(paragraph: str, terms_dict: Dict[str, str]) -> Dict[str,
                 if not base:
                     continue
                 A.add_word(base, (eng_term, chi_term, len(base)))
+                
+                # Add plural forms to automaton
+                if len(base) > 1:
+                    plurals = []
+                    if base.endswith('y') and not base[-2] in 'aeiou':
+                        plurals.append(base[:-1] + 'ies')
+                    elif base.endswith(('s', 'sh', 'ch', 'x', 'z')):
+                        plurals.append(base + 'es')
+                    else:
+                        plurals.append(base + 's')
+                    
+                    for pl in plurals:
+                        A.add_word(pl, (eng_term, chi_term, len(pl)))
+                        for art in ('the', 'a', 'an'):
+                            w_pl = f"{art} {pl}"
+                            A.add_word(w_pl, (eng_term, chi_term, len(w_pl)))
+
                 for art in ('the', 'a', 'an'):
                     w = f"{art} {base}"
                     A.add_word(w, (eng_term, chi_term, len(w)))
@@ -152,8 +169,23 @@ def find_matching_terms(paragraph: str, terms_dict: Dict[str, str]) -> Dict[str,
             base = re.sub(r'\s+', ' ', s).strip().lower()
             if not base:
                 continue
+            
+            # Construct regex for singular and plural
             escaped_base = re.escape(base)
-            pattern = rf'{optional_articles}\b{escaped_base}\b'
+            
+            # Simple pluralization logic for regex
+            if base.endswith('y') and not base[-2] in 'aeiou':
+                plural_base = base[:-1] + 'ies'
+            elif base.endswith(('s', 'sh', 'ch', 'x', 'z')):
+                plural_base = base + 'es'
+            else:
+                plural_base = base + 's'
+            
+            escaped_plural = re.escape(plural_base)
+            
+            # Match either singular or plural, with optional articles
+            pattern = rf'{optional_articles}\b(?:{escaped_base}|{escaped_plural})\b'
+            
             if re.search(pattern, lower_text, re.IGNORECASE):
                 matches[eng_term] = chi_term
     if os.getenv('CSV_MATCH_FUZZY', '0') == '1':

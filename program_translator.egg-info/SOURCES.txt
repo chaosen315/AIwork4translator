@@ -9,6 +9,7 @@ modules/csv_process_tool.py
 modules/markitdown_tool.py
 modules/ner_list_tool.py
 modules/read_tool.py
+modules/terminology_tool.py
 modules/write_out_tool.py
 program_translator.egg-info/PKG-INFO
 program_translator.egg-info/SOURCES.txt
@@ -18,10 +19,15 @@ program_translator.egg-info/requires.txt
 program_translator.egg-info/top_level.txt
 services/__init__.py
 tests/test_api_direct.py
+tests/test_api_parser.py
 tests/test_api_providers.py
+tests/test_get_valid_path.py
+tests/test_join_and_write.py
 tests/test_matching_terms.py
 tests/test_matching_terms_aho.py
+tests/test_plural_article_normalization.py
 tests/test_read_count.py
-tests/test_webui_app.py
+tests/test_terminology_tool.py
+tests/test_validate_csv_file.py
 tests/test_write_out_tool.py
 tests/test_xlsx_conversion.py

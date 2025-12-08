@@ -37,6 +37,8 @@ def dict_to_df(items: List[Dict[str, Any]]):
     pd = _try_import_pandas()
     normalized = [normalize_keys(x) for x in items]
     if pd:
+        if not normalized:
+            return pd.DataFrame(columns=['term', 'translation', 'reason'])
         return pd.DataFrame(normalized)
     return normalized
 
@@ -76,7 +78,8 @@ def merge_new_terms(df, items: List[Dict[str, Any]]):
 def save_glossary_df(df, original_path: str) -> str:
     ts = time.strftime('%Y%m%d_%H%M%S')
     base_dir = os.path.dirname(os.path.abspath(original_path))
-    out_path = os.path.join(base_dir, f'glossary_{ts}.csv')
+    original_name = os.path.splitext(os.path.basename(original_path))[0]
+    out_path = os.path.join(base_dir, f'{original_name}_{ts}.csv')
     pd = _try_import_pandas()
     if pd and isinstance(df, pd.DataFrame):
         df[['term', 'translation']].to_csv(out_path, index=False, encoding='utf-8')
@@ -87,3 +90,11 @@ def save_glossary_df(df, original_path: str) -> str:
         for r in df:
             writer.writerow([r.get('term', ''), r.get('translation', '')])
     return out_path
+
+def save_terms_result(merge_in_place: bool, glossary_df, aggregated_new_terms, original_path: str, blank_csv_path: str) -> str:
+    if merge_in_place:
+        merged_glossary = merge_new_terms(glossary_df, aggregated_new_terms)
+        return save_glossary_df(merged_glossary, original_path)
+    else:
+        new_terms_df = dict_to_df(aggregated_new_terms)
+        return save_glossary_df(new_terms_df, blank_csv_path)

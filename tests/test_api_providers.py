@@ -1,5 +1,5 @@
 import pytest
-from modules.api_tool import KimiProvider, DeepseekProvider, SillionProvider, GeminiProvider, DoubaoProvider
+from modules.api_tool import KimiProvider, DeepseekProvider, SilliconProvider, GeminiProvider, DoubaoProvider
 import os
 from dotenv import load_dotenv
 
@@ -15,7 +15,7 @@ TEST_PROMPT = f"提供术语表：{TEST_TERMS_DICT}。原文：{TEST_ORIGINAL_TE
 @pytest.mark.parametrize("provider_class, provider_name", [
     (KimiProvider, "kimi"),
     (DeepseekProvider, "deepseek"),
-    (SillionProvider, "sillion"),
+    (SilliconProvider, "sillicon"),
     (GeminiProvider, "gemini"),
     (DoubaoProvider, "doubao"),
 ])
