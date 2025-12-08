@@ -1,6 +1,6 @@
 import os
 import traceback
-from modules.api_tool import KimiProvider, DeepseekProvider, SillionProvider, GeminiProvider, DoubaoProvider
+from modules.api_tool import KimiProvider, DeepseekProvider, SilliconProvider, GeminiProvider, DoubaoProvider
 from dotenv import load_dotenv
 
 load_dotenv("data/.env")
@@ -10,7 +10,7 @@ def print_env_status():
     env_vars = [
         "KIMI_API_KEY", "KIMI_BASE_URL",
         "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL",
-        "SILLION_API_KEY", "SILLION_BASE_URL",
+        "SILLICON_API_KEY", "SILLICON_BASE_URL",
         "GEMINI_API_KEY",
         "DOUBAO_API_KEY", "DOUBAO_BASE_URL"
     ]
@@ -33,7 +33,7 @@ TEST_PROMPT = f"提供术语表：{TEST_TERMS_DICT}。原文：{TEST_ORIGINAL_TE
 providers_to_test = [
     (KimiProvider, "kimi"),
     (DeepseekProvider, "deepseek"),
-    (SillionProvider, "sillion"),
+    (SilliconProvider, "sillicon"),
     (GeminiProvider, "gemini"),
     (DoubaoProvider, "doubao"),
 ]

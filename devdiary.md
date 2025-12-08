@@ -256,8 +256,50 @@
   - 偏好文件位于 `data/.prefs.json`（隐藏文件名，资源管理器需启用隐藏文件显示或使用 `Get-ChildItem data -Force`）。
   - 若流程在转换确认阶段选择 `n` 或异常提前退出，则偏好不会写入；需要完成一次正文翻译流程以生成偏好文件。
 
+### 2025/12/08 - Dashboard优化与项目审查
+- **文件修改**：
+  - `main.py`
+  - `modules/terminology_tool.py`
+  - `tests/test_dashboard_columns.py` (新增)
+  - `reviews/program-review-2025-12-08T220000.md` (新增)
+- **主要更新**：
+  1. **Dashboard 监控粒度深化**：
+     - 在 `main.py` 的 dashboard CSV 输出中新增了4个关键性能指标列：
+       - `Term_Matching_Time_s`：术语匹配耗时（使用 `perf_counter` 独立计时）。
+       - `Total_API_Time_s`：API 交互总耗时（包含请求与重试）。
+       - `Pure_API_Time_s`：纯模型推理耗时（累加多次请求）。
+       - `JSON_Repair_Time_s`：JSON 格式修复耗时。
+       - `Retry_Count`：该段落触发的重试次数。
+     - 目的：精确定位任务时长高企的根因（是本地匹配慢、API响应慢还是重试过多）。
+  2. **Bug 修复**：
+     - 修复 `modules/terminology_tool.py` 中的 `dict_to_df` 函数，当输入列表为空时，正确返回包含 `term`, `translation`, `reason` 列的空 DataFrame，解决了测试中的 KeyError 问题。
+  3. **测试覆盖**：
+     - 新增 `tests/test_dashboard_columns.py`，模拟 CLI 流程验证 Dashboard CSV 的表头结构与数据写入正确性。
+  4. **代码审查与重构规划**：
+     - 完成了全面的代码审查（`reviews/program-review-2025-12-08T220000.md`），识别出 `main.py` 的单体架构问题，并提出了基于 `TranslationSession` 类的重构方案。
+
+### 2025/12/08 - API修复与中断保护机制增强
+- **文件修改**：
+  - `main.py`
+  - `modules/terminology_tool.py`
+  - `tests/test_save_glossary_df.py` (新增)
+  - `tests/test_untranslated_rest.py` (新增)
+  - `tests/test_save_terms_result.py` (新增)
+- **主要更新**：
+  1. **API 内容修复优化**：
+     - 在 `main.py` 中增强了对 `Invalid JSON format` 错误的显式处理，当检测到 JSON 格式错误时抛出异常触发段落级重试，防止程序因解析失败而崩溃。
+  2. **翻译流程中断保护**：
+     - **KeyboardInterrupt 捕获**：在 `main.py` 中捕获 `Ctrl+C` 中断信号，确保在用户手动终止程序时，能够保存当前已累积的新术语表和剩余未翻译的原文。
+     - **API 连续失败交互**：当 API 连续失败次数达到上限时，暂停程序并提供交互选项。用户可选择重置失败计数继续重试，或保存进度后退出。
+     - **未翻译部分保存**：通过匹配当前段落的前20个字符，在原文件中定位翻译进度，将剩余未翻译内容保存为 `_rest.md` 文件。
+  3. **术语表保存逻辑优化**：
+     - **无状态封装**：将 `main.py` 中重复的术语保存逻辑封装为 `modules/terminology_tool.py` 中的 `save_terms_result` 函数，统一了“合并保存”与“单独保存”的处理流程。
+     - **文件名修复**：修复 `save_glossary_df` 函数在保存时丢失原文件名的 bug，输出格式规范为 `原文件名_时间戳.csv`。
+  4. **测试覆盖增强**：
+     - 新增针对术语保存文件名、封装函数逻辑及未翻译部分定位算法的单元测试，覆盖 Setext 标题、重复关键词、中文 Unicode 字符等复杂场景。
+
 ## 最后更新时间
-2025/12/04
+2025/12/09
 
 ## 项目结构概览（合并后）
 

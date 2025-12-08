@@ -1,11 +1,11 @@
 import os
 import json
+import time
 from typing import Dict, Any, List, Union
 from abc import ABC, abstractmethod
 from openai import OpenAI
 from google import genai
 from google.genai import types
-import requests
 from pydantic import BaseModel, ValidationError, field_validator
 
 class LLMProvider(ABC):
@@ -35,8 +35,9 @@ class KimiProvider(LLMProvider):
 
 class GPTProvider(LLMProvider):
     def __init__(self):
+        base_url = os.getenv('OPENAI_BASE_URL') or 'https://api.openai.com/v1'
         api_key = os.getenv('OPENAI_API_KEY')
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = os.getenv('GPT_MODEL', 'gpt-realtime')
 
     def generate_completion(self, prompt: str, system_prompt: str):
@@ -98,8 +99,9 @@ class SilliconProvider(LLMProvider):
 
 class GeminiProvider(LLMProvider):
     def __init__(self):
+        base_url = os.getenv('GEMINI_BASE_URL') or None
         api_key = os.getenv('GEMINI_API_KEY')
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version='v1beta', base_url=base_url) or None)
         self.model = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 
     def generate_completion(self, prompt: str, system_prompt: str):
@@ -200,7 +202,8 @@ def parse_translation_response(text: str) -> Dict[str, Any]:
             s = text.find('{')
             e = text.rfind('}')
             if s != -1 and e != -1 and e > s:
-                model = _try_validate_json(text[s:e+1])
+                return {"origin_text": text,
+                        "error": "Invalid JSON format"}
             else:
                 raise ValueError('no_json')
         except Exception:
@@ -238,6 +241,8 @@ class LLMService:
         self.Linkedprovider = self.providers.get(self.provider_name)() # type: ignore
         self.system_prompt = os.getenv('SYSTEM_PROMPT')
         self.structured = os.getenv('STRUCTURED_OUTPUT', 'True').lower() in ('1', 'true', 'yes')
+        self._rpm_limit = int(os.getenv('Requests_Per_Minute', '0'))
+        self._req_ts: List[float] = []
 
     @property
     def provider(self):
@@ -258,11 +263,19 @@ class LLMService:
         return base_prompt
 
     def call_ai_model_api(self, prompt: str):
+        self._enforce_rate_limit()
         content, total_tokens = self.Linkedprovider.generate_completion(prompt, self.system_prompt)
         if self.structured:
             parsed = parse_translation_response(content)
             return parsed, total_tokens
         return {"translation": content, "notes": "", "newterminology": []}, total_tokens
+
+    def repair_json(self, origin_text: str) -> Dict[str, Any]:
+        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:",r"{\"translation\": \"...\",\"notes\": [\"术语1：注释\",\"术语2：注释\"], \"newterminology\": [{\"term\": \"...\", \"translation\": \"...\", \"reason\": \"...\"}]}。"])
+        self._enforce_rate_limit()
+        response_obj, _ = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
+        parsed = parse_translation_response(response_obj)
+        return parsed
 
     def test_api(self) -> Dict[str, Any]:
         results = {
@@ -296,3 +309,16 @@ class LLMService:
                     "error": str(e),
                 })
         return results
+
+    def _enforce_rate_limit(self) -> None:
+        if self._rpm_limit <= 0:
+            return
+        now = time.time()
+        self._req_ts = [t for t in self._req_ts if now - t < 60.0]
+        if len(self._req_ts) >= self._rpm_limit:
+            wait = 60.0 - (now - self._req_ts[0])
+            if wait > 0:
+                time.sleep(wait)
+            now = time.time()
+            self._req_ts = [t for t in self._req_ts if now - t < 60.0]
+        self._req_ts.append(time.time())

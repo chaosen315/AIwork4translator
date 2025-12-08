@@ -5,17 +5,23 @@
 
 Precise technical-document translation powered by glossary-aware prompts and robust Markdown segmentation. This project provides both CLI and WebUI with a unified module layer.
 
-## Latest Update (2025/12/06)
+## Latest Update (2025/12/09)
 
-We’ve shipped an exciting refactor focused on Dynamic Terminology Management, dramatically improving stability and consistency for long-form document translation:
+We have continuously optimized the robustness and interaction experience of the program, adding comprehensive protection mechanisms for abnormal scenarios and improving the dynamic terminology management function:
 
-- Terminology union matching: newly detected terms are collected during translation and unioned with the CSV glossary for matching, maximizing term hits.
-- Controlled merge switch: at the end, choose whether to merge new terms back into the glossary; if not, a separate “new-terms CSV” is exported for review.
-- Paragraph-level retries: transient API hiccups no longer break the flow; failures reset on the next success.
-- Proper-noun matching optimization: better case handling for names like HOPKINS/Hopkins without harmful lemmatization.
-- Structured output and prompts: translation and notes are separated; notes are list-form and include reasons for new terminology choices, closing the review loop.
+### 🛡️ Exception Protection and Interruption Recovery
+- **Interactive Failure Recovery**: When the number of consecutive API failures reaches the limit, the program no longer exits directly, but pauses and offers options: users can choose to "reset failure count and continue retrying" or "save current progress and exit".
+- **Manual Interruption Protection**: Captures `Ctrl+C` interrupt signals to ensure that the accumulated glossary and remaining untranslated original text can be safely saved when the user manually stops the program.
+- **Resume Support**: The program automatically locates and saves the untranslated part as a `_rest.md` file, facilitating subsequent translation continuation.
+- **API Content Auto-Repair**: Implemented automatic detection and paragraph-level retry mechanisms for JSON format errors returned by the API, preventing program crashes caused by single parsing failures.
 
-Plan change: the “empty glossary generation” feature is temporarily deprecated due to insufficient effectiveness; it may be rebuilt or removed.
+### 🚀 Interaction Experience and Terminology Management
+- **CLI Preference Memory**: Automatically loads the last used API platform, file path, and other configurations at startup; simply press Enter to reuse them.
+- **Terminology Union Matching**: Real-time collection of "new terms" during translation, forming a union with the CSV glossary for matching to maximize term hit rate.
+- **Controllable Merge Switch**: At the end of translation or upon interruption, users can interactively choose whether to merge newly collected terms into the original glossary; if not merged, they are automatically exported as an independent CSV file (`original_filename_timestamp.csv`).
+- **Proper Noun Matching Optimization**: More robust case normalization for all-uppercase/capitalized proper nouns (e.g., HOPKINS/Hopkins).
+
+> Plan Change: Due to the current suboptimal performance of the "Blank Glossary Generation" function, it has been decided to temporarily remove it. It may be refactored or discontinued in the future depending on the situation.
 
 ## Table of Contents
 - Overview
@@ -50,6 +56,8 @@ AIwork4translator focuses on translating technical documents while preserving te
 - **CLI Preference Memory**: Automatically remembers last used provider and file paths for faster startup.
 - **Two-column Markdown editor**: WebUI split-view (original vs translation) with live progress.
 - **Real-time progress**: Live polling and safe autosave after completion.
+- **Interruption Protection & Recovery**: Supports Ctrl+C safe interruption, automatically saving progress and untranslated content.
+- **Interactive Failure Recovery**: Provides pause and retry options upon consecutive API failures to prevent accidental task termination.
 - **Interactive confirmation**: For non-Markdown conversion steps.
 - **Optional empty glossary generation**: Via NER (CLI) (Note: planned temporary deprecation; see Roadmap).
 - **Structured translation**: Smart segmentation based on Markdown headers.
@@ -136,10 +144,19 @@ python -m pytest
 - Select the provider (kimi/gpt/deepseek/ollama) - defaults to last used
 - Enter the input file path - defaults to last used
   - If the file is not Markdown, it will be converted via MarkItDown and you will be prompted to continue (y/n)
-- If you don’t have a glossary, choose `n` to generate an empty glossary via NER, then exit and fill the translation column
-- If you have a glossary, provide the CSV path and proceed with translation
-  - Supports `.xlsx` input (auto-converted to `.csv`)
-- Progress prints: `Translating segment [current]/[total]`
+#### Glossary Handling
+
+1. If you don't have a glossary CSV, enter `n`. The program will automatically create a blank glossary file.
+   - Filename format: `[Original_Filename]_output_terminology.csv`
+   - You can fill in this file after translation (or interruption) for future use.
+   - *Note: NER-based automatic generation is temporarily deprecated.*
+
+2. If you have a glossary CSV, enter `y` to provide the file path.
+   - Enter the path to your CSV glossary (direct `.xlsx` input is supported; it will be auto-converted).
+   - **New Term Merge Option**:
+     - After entering the path, you will be asked: "Merge new terms into the glossary? (y/n)".
+     - Select `y`: Newly discovered terms will be appended to your original CSV (deduplicated) and saved as a backup.
+     - Select `n`: New terms will be saved separately in a new CSV file, leaving the original file untouched.
 
 ### WebUI
 - Run `uv run app.py`
