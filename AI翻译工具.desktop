@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AI 翻译工具
+Comment=专业的 AI 翻译工具，支持多种文件格式和术语表
+Exec=gnome-terminal -- bash -c "cd '%{INSTALL_DIR}' && ./AI翻译工具; echo ''; echo '按 Enter 键退出...'; read"
+Icon=applications-office
+Terminal=false
+Categories=Office;Utility;
+Keywords=翻译;translate;AI;
+
+# 安装说明：
+# 1. 将此文件复制到 ~/.local/share/applications/
+# 2. 编辑文件，将 %{INSTALL_DIR} 替换为实际安装路径
+# 3. 运行: chmod +x ~/.local/share/applications/AI翻译工具.desktop
+# 4. 运行: update-desktop-database ~/.local/share/applications/

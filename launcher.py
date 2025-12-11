@@ -102,18 +102,38 @@ def main():
     # 启动 FastAPI 应用
     print("\n正在启动 Web 服务器...")
     print("按 Ctrl+C 退出应用\n")
+    print("-" * 60)
     
     try:
         import uvicorn
         from app import app
         
-        # 运行服务器
+        # 运行服务器 - 启用日志输出到控制台
         uvicorn.run(
             app,
             host="127.0.0.1",
             port=8000,
             log_level="info",
-            access_log=False  # 减少日志输出
+            access_log=True,  # 启用访问日志
+            log_config={
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "default": {
+                        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    },
+                },
+                "handlers": {
+                    "default": {
+                        "formatter": "default",
+                        "class": "logging.StreamHandler",
+                        "stream": "ext://sys.stdout",
+                    },
+                },
+                "loggers": {
+                    "uvicorn": {"handlers": ["default"], "level": "INFO"},
+                },
+            }
         )
     except KeyboardInterrupt:
         print("\n\n应用已停止")
