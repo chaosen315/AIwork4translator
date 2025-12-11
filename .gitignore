@@ -5,6 +5,9 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
+build/
+dist/
+modules/__pycache__/
 
 # Secrets and environment
 # Ignore all data contents by default, except README and .env.example

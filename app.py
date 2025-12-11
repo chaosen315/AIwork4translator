@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, UploadFile
@@ -16,6 +17,15 @@ from modules.markitdown_tool import markitdown_tool
 from dotenv import load_dotenv
 import uvicorn
 import shutil
+
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径（支持 PyInstaller 打包后的环境）"""
+    try:
+        # PyInstaller 创建临时文件夹，路径存储在 _MEIPASS 中
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,16 +51,24 @@ def log_error(error, details=None):
     else:
         print(f"[{timestamp}] [ERROR] {error}")
         logger.error(error)
-load_dotenv(dotenv_path=r"data/.env")
-log_action("应用启动", "初始化环境变量")
+
+# 优先加载当前目录的 .env，然后尝试 data/.env
+if os.path.exists(".env"):
+    load_dotenv(dotenv_path=".env")
+    log_action("应用启动", "从 .env 加载环境变量")
+elif os.path.exists("data/.env"):
+    load_dotenv(dotenv_path="data/.env")
+    log_action("应用启动", "从 data/.env 加载环境变量")
+else:
+    log_action("应用启动", "未找到 .env 文件，使用默认配置")
 
 app = FastAPI()
 log_action("FastAPI应用创建成功")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=get_resource_path("static")), name="static")
 log_action("静态文件目录挂载", "/static -> static/")
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=get_resource_path("templates"))
 log_action("模板引擎初始化", "templates目录")
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
