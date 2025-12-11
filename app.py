@@ -41,7 +41,7 @@ def log_error(error, details=None):
     else:
         print(f"[{timestamp}] [ERROR] {error}")
         logger.error(error)
-load_dotenv(dotenv_path=r"data\.env")
+load_dotenv(dotenv_path=r"data/.env")
 log_action("应用启动", "初始化环境变量")
 
 app = FastAPI()
@@ -264,7 +264,7 @@ def add_to_cache(md_filepath: str, nerlist_filepath: str, llm_provider: str) -> 
     global parameter_cache
     if not os.path.isabs(md_filepath):
         md_filepath = str(UPLOAD_DIR / md_filepath)
-    if not os.path.isabs(nerlist_filepath):
+    if nerlist_filepath and not os.path.isabs(nerlist_filepath):
         nerlist_filepath = str(UPLOAD_DIR / nerlist_filepath)
     log_action("缓存参数", f"MD文件路径: {md_filepath}, NER列表路径: {nerlist_filepath}, LLM提供商: {llm_provider}")
     cache_item = {

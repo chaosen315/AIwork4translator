@@ -86,4 +86,5 @@ Requires-Dist: tzdata==2025.2
 Requires-Dist: urllib3==2.5.0
 Requires-Dist: google-genai>=1.52.0
 Requires-Dist: pyahocorasick>=2.2.0
+Requires-Dist: openpyxl>=3.1.5
 Dynamic: license-file
