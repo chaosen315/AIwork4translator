@@ -44,7 +44,7 @@ def log_error(error, details=None):
     else:
         print(f"[{timestamp}] [ERROR] {error}")
         logger.error(error)
-load_dotenv(dotenv_path=r"/.env")
+load_dotenv(dotenv_path="data/.env")
 log_action("应用启动", "初始化环境变量")
 
 app = FastAPI()
