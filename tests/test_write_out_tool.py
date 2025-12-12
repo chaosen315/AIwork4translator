@@ -5,8 +5,8 @@ def test_write_structured_appends_content_when_header_matches_atx(tmp_path):
     md = tmp_path / "doc.md"
     md.write_text("# Title\n\nExisting.\n", encoding="utf-8")
     metadata = {
-        "current_level": 1,
-        "header_path": ["# Title"],
+        "current_level": 2,
+        "header_path": ["# Title", "# 标题"],
         "is_continuation": False,
     }
     write_to_markdown(str(md), ("New para", metadata), mode="structured")

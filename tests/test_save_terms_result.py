@@ -24,10 +24,10 @@ def test_save_terms_result_merge_in_place_list_df(tmp_path):
     fname = os.path.basename(out_path)
     assert fname.startswith("terms_")
     rows = read_csv_rows(out_path)
-    assert rows[0] == ["term", "translation"]
-    assert ["England", "英格兰"] in rows
-    assert ["France", "法国"] in rows
-    assert ["Germany", "德国"] in rows
+    assert rows[0] == ["term", "translation", "reason"]
+    assert ["England", "英格兰", ""] in rows
+    assert ["France", "法国", ""] in rows
+    assert ["Germany", "德国", ""] in rows
 
 
 def test_save_terms_result_new_glossary_path_list_df(tmp_path):
@@ -42,7 +42,6 @@ def test_save_terms_result_new_glossary_path_list_df(tmp_path):
     fname = os.path.basename(out_path)
     assert fname.startswith("input_output_terminology_")
     rows = read_csv_rows(out_path)
-    assert rows[0] == ["term", "translation"]
-    assert ["Board Game", "桌游"] in rows
-    assert ["Card", "卡牌"] in rows
-
+    assert rows[0] == ["term", "translation", "reason"]
+    assert ["Board Game", "桌游", ""] in rows
+    assert ["Card", "卡牌", ""] in rows

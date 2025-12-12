@@ -1,5 +1,5 @@
 import pytest
-from modules.api_tool import KimiProvider, DeepseekProvider, SilliconProvider, GeminiProvider, DoubaoProvider
+from modules.api_tool import KimiProvider, DeepseekProvider, SiliconProvider, GeminiProvider, DoubaoProvider
 import os
 from dotenv import load_dotenv
 
@@ -9,13 +9,13 @@ TEST_TERMS_DICT = {"night city": "夜之城"}
 TEST_ORIGINAL_TEXT = "Night City was like a deranged experiment in social Darwinism, designed by a bored researcher who kept one thumb permanently on the fast-forward button."
 TEST_SYSTEM_PROMPT = "你是一个专业的翻译助手，请将英文文本翻译成中文，注意保留术语表中的专有名词翻译。"
 
-# 构建完整的测试prompt
-TEST_PROMPT = f"提供术语表：{TEST_TERMS_DICT}。原文：{TEST_ORIGINAL_TEXT}"
+# 构建完整的测试prompt - 为支持json_object格式，添加json关键词
+TEST_PROMPT = f"提供术语表：{TEST_TERMS_DICT}。原文：{TEST_ORIGINAL_TEXT}。请以json格式返回翻译结果。"
 
 @pytest.mark.parametrize("provider_class, provider_name", [
     (KimiProvider, "kimi"),
     (DeepseekProvider, "deepseek"),
-    (SilliconProvider, "sillicon"),
+    (SiliconProvider, "silicon"),
     (GeminiProvider, "gemini"),
     (DoubaoProvider, "doubao"),
 ])

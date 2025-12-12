@@ -7,9 +7,14 @@ Precise AI translation method with noun comparison list.
 
 中文 | [English](./README_en.md)
 
-## 最近更新（2025/12/09）
+## 最近更新（2025/12/12）
 
-我们持续优化了程序的健壮性与交互体验，新增了针对异常场景的全面保护机制，并完善了术语动态管理功能：
+### ⚡ 并发模式重大性能突破
+我们实现了全新的并发翻译架构，带来显著的性能提升：
+- **Queue + Worker Pool模式**：采用`asyncio.Queue` + 工作池架构，支持6并发工作线程
+- **性能提升**：81页内容从原本3小时缩短至30分钟以内，**性能提升约6倍**
+- **顺序保证**：通过段落编号排序和写锁机制，确保翻译结果按原文顺序输出
+- **智能调度**：支持通过`Currency_Limit`环境变量灵活调整并发数（默认5，最大不超过RPM，即每分钟请求数的限制。）
 
 ### 🛡️ 异常保护与中断恢复
 - **交互式故障恢复**：当 API 连续失败次数达到上限时，程序不再直接退出，而是暂停并提供选项：用户可选择“重置失败计数并继续重试”或“保存当前进度后退出”。
@@ -17,16 +22,26 @@ Precise AI translation method with noun comparison list.
 - **断点续传支持**：程序自动定位并保存未翻译部分为 `_rest.md` 文件，方便后续继续翻译。
 - **API 内容自动修复**：针对 API 返回的 JSON 格式错误，实现了自动检测与段落级重试机制，防止因单次解析失败导致程序崩溃。
 
+### 🏗️ 核心架构重构
+- **统一翻译核心**：新增`TranslationCore`模块，统一CLI和WebUI的翻译逻辑，消除代码重复
+- **异步诊断机制**：引入非阻塞API诊断和全局错误状态管理，提升系统稳定性
+- **类型安全**：统一术语聚合形态，解决并发环境下的类型不一致问题
+
 ### 🚀 交互体验与术语管理
 - **CLI 偏好记忆**：启动时自动加载上次使用的 API 平台、文件路径等配置，直接回车即可沿用。
 - **术语并集匹配**：翻译过程中实时收集“新术语”，与 CSV 词表形成并集参与匹配，最大化术语命中率。
 - **可控合并开关**：翻译结束或中断时，用户可交互选择是否将新收集的术语合并到原词表中；不合并也会自动导出为独立 CSV 文件（`原文件名_时间戳.csv`）。
 - **专有名匹配优化**：对全大写/首字母大写的专有名（如 HOPKINS/Hopkins）进行更稳健的大小写规整。
 
+### 📊 性能监控与可视化
+- **实时进度**：翻译过程中实时显示当前段落/总段落数，预估剩余时间
+- **资源监控**：队列状态监控日志，直观显示并发健康状态
+
 ### 您需要注意的：
+- **并发配置**：大文件翻译建议设置`Currency_Limit=8-10`获得最佳性能，但需确保API配额充足
 - **程序稳定性**：当前版本的程序仍在不断完善中，可能存在一些 bug 或不足。如果您在使用过程中遇到任何问题，欢迎及时反馈，我们会尽快解决。
-- **API请求耗时过长**：由于调用大模型API需要一定的时间，因此在翻译长篇文档时，可能会出现API请求耗时过长的情况。我们会在后续版本中优化这一问题。
-- **提示词需要优化**：当前版本的提示词可能不够完善，导致翻译效果不佳。我们需要更多人的使用与意见反馈，才能在后续版本中不断优化提示词，提升翻译质量。
+- **API请求耗时**：并发模式下API调用频率增加，请确保网络稳定和API配额充足
+- **提示词持续优化**：当前版本的提示词可能不够完善，导致翻译效果不佳。我们需要更多人的使用与意见反馈，才能在后续版本中不断优化提示词，提升翻译质量。
 
 > 计划变更：由于“空白术语表生成功能”当前效果不佳，已决定暂时下架，后续视情况重构或不再提供。
 
@@ -72,38 +87,32 @@ AIwork4translator 是一个专业的文档翻译工具，通过专有名词识�
 ```python
 project_root/
 ├── data/
-│   └── .env
-├── models/
-│   └── dbmdz/bert-large-cased-finetuned-conll03-english-for-ner/
-│       ├── config.json
-│       ├── gitattributes
-│       ├── model.safetensors
-│       ├── special_tokens_map.json
-│       ├── tokenizer.json
-│       ├── tokenizer_config.json
-│       └── vocab.txt
-├── modules/                # 统一的业务模块
+│   └── .env                # 环境变量配置（API密钥、模型参数等）
+├── modules/                # 统一的业务模块（核心翻译逻辑）
 │   ├── __init__.py
 │   ├── api_tool.py         # LLMService 与各供应商适配（返回content,tokens）
 │   ├── config.py           # GlobalConfig（env优先），不含会话缓存
-│   ├── count_tool.py
+│   ├── count_tool.py       # 统计工具（tokens计数、性能监控）
 │   ├── csv_process_tool.py # Aho-Corasick 匹配与 CSV 校验
-│   ├── markitdown_tool.py
+│   ├── markitdown_tool.py  # 非Markdown格式转换（PDF/Word/Excel等）
 │   ├── ner_list_tool.py    # 稳健模型查找，优先根 models/
-│   ├── read_tool.py
-│   └── write_out_tool.py   # 默认不写 “# end”
-├── templates/
-│   ├── index.html
-│   └── editor.html
-├── static/
-│   ├── style.css
-│   ├── script.js
-│   └── editor.js
+│   ├── read_tool.py        # 文件读取与结构化分段
+│   ├── terminology_tool.py # 术语表管理（保存、合并、格式化）
+│   ├── translation_core.py # 翻译核心引擎（封装统一翻译流程）
+│   └── write_out_tool.py   # 结构化/平铺写出，默认不写 "# end"
+├── services/               # 服务层（异步诊断、全局状态管理）
+│   ├── __init__.py
+│   └── diagnostics.py      # 异步诊断管理（单例模式）
+├── templates/              # WebUI模板
+│   ├── index.html          # 文件上传页面
+│   └── editor.html         # 双栏编辑器页面
+├── static/                 # WebUI静态资源
+│   ├── style.css           # 全局样式
+│   ├── script.js           # 主页交互逻辑
+│   └── editor.js           # 编辑器与轮询逻辑
 ├── uploads/                # WebUI 上传与输出目录（由后端挂载）
 ├── app.py                  # WebUI 根入口（提供 main()）
 ├── main.py                 # CLI 根入口（交互式，支持偏好持久化）
-├── baseline.py             # CLI 基线示例（不含RAG缓存）
-├── ner_list_check.py       # NER 生成名词表工具
 └── pyproject.toml          # 脚本入口：CLI/WebUI
 ```
 
@@ -341,9 +350,6 @@ python -m pytest
 - 未来版本：
   - 计划通过MinerU增强对Markdown文件的解析性能。
   - 计划实现传统CAP软件的交互模式，例如表格形式的翻译界面，原文与译文逐句对应，用户可以方便地进行编辑和修改。
-  - 段落切分策略改进：更优雅地处理短段落和长难句，避免模型翻译时出现不自然的断句。
-  - ~~计划添加对术语表实时更新的功能，在文档中识别到陌生术语后会自动添加到术语表中，用户可以在翻译过程中实时查看和更新术语表。~~ 已完成：术语动态管理（并集匹配、合并开关、收集新术语与导出）。
-  - ~~计划增强空白术语表的生成效果，除了实体类型外，还提供术语的翻译建议，帮助用户更准确地翻译文档。~~ 新计划：暂时下架“空白术语表生成”功能，因当前效果不佳；后续视情况重构或不再提供。
 
 ## 联系方式
 

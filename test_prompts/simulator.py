@@ -398,7 +398,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='翻译提示词仿真测试工具')
     parser.add_argument('--provider', default='kimi', 
-                       choices=['kimi', 'deepseek', 'gpt', 'sillicon', 'gemini', 'doubao'],
+                       choices=['kimi', 'deepseek', 'gpt', 'silicon', 'gemini', 'doubao'],
                        help='选择LLM提供商')
     parser.add_argument('--sample', type=int, help='只测试指定编号的样例')
     
