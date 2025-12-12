@@ -13,9 +13,12 @@ from modules.csv_process_tool import validate_csv_file, load_terms_dict, find_ma
 from modules.api_tool import LLMService
 from modules.write_out_tool import write_to_markdown
 from modules.markitdown_tool import markitdown_tool
+from modules.translation_core import TranslationCore, TranslationResult, TerminologyPolicy
+from services.diagnostics import global_diagnostics
 from dotenv import load_dotenv
 import uvicorn
 import shutil
+import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -137,7 +140,7 @@ async def validate_file(
             "message": f"文件处理错误：{str(e)}"
         })
 
-def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
+async def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
     log_action("处理文件开始", f"MD文件: {input_md_file}, CSV文件: {csv_file}, LLM提供商: {llm_provider}")
     try:
         log_action("LLM服务初始化", f"提供商: {llm_provider}")
@@ -153,6 +156,10 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
         }
     llm_service.provider = llm_provider
     log_action("LLM提供商设置", f"提供商: {llm_provider}")
+    
+    # 初始化 Core
+    translation_core = TranslationCore(llm_service)
+    
     preservestructure = PS
     log_action("配置参数", f"preservestructure = {preservestructure}, PS = {PS}")
     CHUNK_SIZE = global_config.max_chunk_size
@@ -166,6 +173,10 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
     log_action("术语字典加载", f"CSV文件: {csv_file}")
     terms_dict = load_terms_dict(csv_file)
     log_action("术语字典加载完成", f"术语数量: {len(terms_dict) if terms_dict else 0}")
+    
+    # 简单的聚合新术语字典（WebUI 目前没有持久化这些，但可以用于复写）
+    aggregated_new_terms = {} 
+    
     counter = 1
     while os.path.exists(output_md_file):
         log_action("输出文件已存在", f"文件: {output_md_file}，添加编号后缀")
@@ -183,6 +194,7 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
     if task_id in translation_tasks:
         translation_tasks[task_id]["total_paragraphs"] = total_paragraphs
     log_action("段落处理开始", f"总段落数: {total_paragraphs}")
+    
     for idx, segment in enumerate(paragraphs):
         log_action(f"处理段落[{idx+1}/{total_paragraphs}]", "开始解析segment格式")
         try:
@@ -200,18 +212,44 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
             paragraph = segment
             meta_data = None
             log_action(f"段落[{idx+1}]降级处理", "使用扁平模式 (flat)")
-        log_action(f"段落[{idx+1}]专业名词检测", "开始查找匹配术语")
-        specific_terms_dict = find_matching_terms(paragraph, terms_dict)
-        log_action(f"段落[{idx+1}]专业名词检测完成", f"匹配术语数: {len(specific_terms_dict) if specific_terms_dict else 0}")
-        log_action(f"段落[{idx+1}]提示词构造", "开始生成API调用提示词")
-        prompt = llm_service.create_prompt(paragraph, specific_terms_dict)
-        log_action(f"段落[{idx+1}]提示词构造完成", f"提示词长度: {len(prompt)}")
+            
+        # 构造 Core 所需的 segment dict
+        segment_data = {
+            "content": paragraph,
+            "meta_data": meta_data
+        }
+
         try:
-            log_action(f"段落[{idx+1}]API调用", "开始调用AI模型API")
-            result = llm_service.call_ai_model_api(prompt)
-            response = result[0] if isinstance(result, tuple) else result
-            log_action(f"段落[{idx+1}]API调用成功", f"响应长度: {len(str(response))}")
+            log_action(f"段落[{idx+1}]调用核心", "TranslationCore.execute_translation_step")
+            
+            result = await translation_core.execute_translation_step(
+                segment_data, 
+                terms_dict, 
+                aggregated_new_terms,
+                terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT
+            )
+            
+            if not result.success:
+                raise Exception(result.error)
+
+            # 更新 aggregated_new_terms
+            for nt in result.new_terms_delta:
+                k = str(nt.get('term', '')).strip()
+                v = str(nt.get('translation', '')).strip()
+                if k:
+                    aggregated_new_terms[k] = v
+
+            response = result.content
+            # WebUI 之前的逻辑没有拼接 notes，这里我们加上 notes 拼接逻辑以保持一致性
+            if result.notes:
+                # 简单拼接，WebUI 的前端可能不需要特殊的格式，或者我们按照 MD 格式
+                # 之前的代码只是 response = result[0]，没有拼接 notes
+                # 这里为了体验更好，拼接上
+                response += f"\n\n---\n\n{result.notes}\n"
+            
+            log_action(f"段落[{idx+1}]调用成功", f"响应长度: {len(response)}")
             consecutive_failures = 0
+            
             log_action(f"段落[{idx+1}]结果写入", f"模式: {'structured' if preservestructure else 'flat'}")
             if preservestructure:
                 write_to_markdown(
@@ -236,7 +274,10 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
                 translation_tasks[task_id]["error"] = error_msg
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 log_action("连续失败阈值触发", f"连续{MAX_CONSECUTIVE_FAILURES}次失败，开始API测试")
-                test_results = llm_service.test_api()
+                # 调用同步的 test_api，这里需要 to_thread 吗？
+                # test_api 是 sync 的。我们在这个 async 函数里可以直接调，也可以 to_thread
+                test_results = await asyncio.to_thread(llm_service.test_api)
+                
                 log_action("API测试完成", f"测试结果: {test_results}")
                 return {
                     "status": "error",
@@ -252,7 +293,6 @@ def process_files(input_md_file: str, csv_file: str, llm_provider: str) -> dict:
         "output_file": output_md_file
     }
 
-import asyncio
 from fastapi.responses import RedirectResponse
 from typing import List, Dict
 
@@ -452,7 +492,8 @@ async def run_translation_task(md_path, csv_path, llm_provider, task_id):
         total_paragraphs = count_structured_paragraphs(md_path, max_chunk_size=global_config.max_chunk_size, preserve_structure=PS)
         if task_id in translation_tasks:
             translation_tasks[task_id]["total_paragraphs"] = total_paragraphs
-        result = await asyncio.to_thread(process_files_with_progress, md_path, csv_path, llm_provider, task_id)
+        # 改为直接 await，不再 to_thread
+        result = await process_files_with_progress(md_path, csv_path, llm_provider, task_id)
         if result.get("status") == "error":
             translation_tasks[task_id]["status"] = "error"
             translation_tasks[task_id]["error"] = result.get("message", "翻译失败")
@@ -464,17 +505,55 @@ async def run_translation_task(md_path, csv_path, llm_provider, task_id):
         translation_tasks[task_id]["error"] = str(e)
 
 import functools
-def process_files_with_progress(input_md_file, csv_file, llm_provider, task_id):
-    def update_progress(current, total):
-        translation_tasks[task_id]["current_paragraph"] = current
-        translation_tasks[task_id]["total_paragraphs"] = total
-    original_write = functools.partial(write_to_markdown)
-    def write_with_progress(*args, **kwargs):
-        result = original_write(*args, **kwargs)
-        current = translation_tasks[task_id]["current_paragraph"]
-        update_progress(current + 1, translation_tasks[task_id]["total_paragraphs"])
-        return result
-    return process_files(input_md_file, csv_file, llm_provider)
+async def process_files_with_progress(input_md_file, csv_file, llm_provider, task_id):
+    # 注意：这里我们覆盖了 write_to_markdown，但 process_files 内部直接调用 write_to_markdown
+    # 由于 process_files 已经改为 async，我们无法像之前那样用 partial 覆盖全局函数（或者说那样很脏）。
+    # 之前是：original_write = functools.partial(write_to_markdown); def write_with_progress...
+    # 但是 process_files 并没有接受 write_func 参数，它是直接 import 的。
+    # 之前的实现是如何生效的？
+    # 原代码：
+    # def process_files_with_progress(...):
+    #    ...
+    #    return process_files(...)
+    # 并没有替换 process_files 里的 write_to_markdown！
+    # 除非 process_files 接受了一个 writer 参数，但它没有。
+    # 仔细看原代码：
+    # 471→    original_write = functools.partial(write_to_markdown)
+    # 472→    def write_with_progress(*args, **kwargs):
+    # 473→        result = original_write(*args, **kwargs)
+    # 477→    return process_files(input_md_file, csv_file, llm_provider)
+    # 
+    # 这段代码（原版）看起来是无效的？它定义了 write_with_progress 但没用它？
+    # 或者说 process_files 实际上并没有被正确 hook。
+    # 唯一的解释是原作者想做 hook 但没做成，或者我看漏了什么。
+    # 不管怎样，现在的 process_files_with_progress 需要实现进度更新。
+    
+    # 由于我们现在改写了 process_files，我们可以直接把 task_id 传进去让它更新进度？
+    # 但 process_files 签名是 (input_md_file, csv_file, llm_provider)。
+    # 我们可以利用 global translation_tasks，但 process_files 不知道 task_id。
+    # 
+    # 实际上，现在的 process_files 内部已经有更新 translation_tasks 的逻辑了！
+    # 在第 228 行：
+    # if task_id in translation_tasks: translation_tasks[task_id]["current_paragraph"] = idx + 1
+    # 
+    # 但是 process_files 的参数里没有 task_id。
+    # 这里的 task_id 是局部变量（由 output_md_file 的 basename 算出）。
+    # 在 run_translation_task 里，task_id 是 output_md_file 的 basename 吗？
+    # start_translation 里：task_id = os.path.basename(output_md_file)
+    # process_files 里：task_id = os.path.basename(output_md_file)
+    # 所以它们算出的 task_id 是一样的。
+    # 所以 process_files *内部* 已经实现了进度更新（通过访问全局 translation_tasks）。
+    # 
+    # 那么 process_files_with_progress 这个函数其实是多余的，或者它只是为了兼容接口？
+    # 原来的 process_files_with_progress 试图 hook write，但实际上 process_files 自己也更新进度吗？
+    # 原 process_files 里有：
+    # if task_id in translation_tasks: ...
+    # 是的，原代码里 process_files 就有这逻辑。
+    # 所以 process_files_with_progress 可能是废代码，或者是某种尝试。
+    # 
+    # 我们直接保留 process_files_with_progress 的签名，直接调用 process_files 即可。
+    
+    return await process_files(input_md_file, csv_file, llm_provider)
 
 @app.get("/translation-progress")
 async def translation_progress(task_id: str = None, output_file: str = None):

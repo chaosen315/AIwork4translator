@@ -56,23 +56,29 @@ def merge_new_terms(df, items: List[Dict[str, Any]]):
         base = df.copy()
         if 'term' not in base.columns or 'translation' not in base.columns:
             base = base.rename(columns={list(base.columns)[0]: 'term', list(base.columns)[1]: 'translation'})
-        merged_terms = base[['term', 'translation']].dropna()
+        
+        if 'reason' not in base.columns:
+            base['reason'] = ''
+
+        merged_terms = base[['term', 'translation', 'reason']].dropna(subset=['term', 'translation'])
         if isinstance(new_df, pd.DataFrame) and not new_df.empty:
-            add_df = new_df[['term', 'translation']].dropna()
+            if 'reason' not in new_df.columns:
+                new_df['reason'] = ''
+            add_df = new_df[['term', 'translation', 'reason']].dropna(subset=['term', 'translation'])
             merged_terms = pd.concat([merged_terms, add_df], ignore_index=True)
         merged_terms = merged_terms.drop_duplicates(subset=['term'], keep='first')
         return merged_terms
     base_rows = []
     if isinstance(df, list):
-        base_rows = [{'term': r.get('term', ''), 'translation': r.get('translation', '')} for r in df]
-    add_rows = [{'term': r.get('term', ''), 'translation': r.get('translation', '')} for r in items]
+        base_rows = [{'term': r.get('term', ''), 'translation': r.get('translation', ''), 'reason': r.get('reason', '')} for r in df]
+    add_rows = [{'term': r.get('term', ''), 'translation': r.get('translation', ''), 'reason': r.get('reason', '')} for r in items]
     seen = set()
     result: List[Dict[str, Any]] = []
     for r in base_rows + add_rows:
         t = r.get('term', '')
         if t and t not in seen:
             seen.add(t)
-            result.append({'term': r.get('term', ''), 'translation': r.get('translation', '')})
+            result.append(r)
     return result
 
 def save_glossary_df(df, original_path: str) -> str:
@@ -82,13 +88,24 @@ def save_glossary_df(df, original_path: str) -> str:
     out_path = os.path.join(base_dir, f'{original_name}_{ts}.csv')
     pd = _try_import_pandas()
     if pd and isinstance(df, pd.DataFrame):
-        df[['term', 'translation']].to_csv(out_path, index=False, encoding='utf-8')
+        cols = ['term', 'translation']
+        if 'reason' in df.columns:
+            cols.append('reason')
+        df[cols].to_csv(out_path, index=False, encoding='utf-8')
         return out_path
     with open(out_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['term', 'translation'])
+        header = ['term', 'translation']
+        has_reason = False
+        if isinstance(df, list) and len(df) > 0 and 'reason' in df[0]:
+            has_reason = True
+            header.append('reason')
+        writer.writerow(header)
         for r in df:
-            writer.writerow([r.get('term', ''), r.get('translation', '')])
+            row = [r.get('term', ''), r.get('translation', '')]
+            if has_reason:
+                row.append(r.get('reason', ''))
+            writer.writerow(row)
     return out_path
 
 def save_terms_result(merge_in_place: bool, glossary_df, aggregated_new_terms, original_path: str, blank_csv_path: str) -> str:

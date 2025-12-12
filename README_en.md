@@ -5,15 +5,25 @@
 
 Precise technical-document translation powered by glossary-aware prompts and robust Markdown segmentation. This project provides both CLI and WebUI with a unified module layer.
 
-## Latest Update (2025/12/09)
+## Latest Update (2025/12/12)
 
-We have continuously optimized the robustness and interaction experience of the program, adding comprehensive protection mechanisms for abnormal scenarios and improving the dynamic terminology management function:
+### ⚡ Major Concurrency Performance Breakthrough
+We have implemented a brand-new concurrent translation architecture, bringing significant performance improvements:
+- **Queue + Worker Pool Mode**: Adopts `asyncio.Queue` + worker pool architecture, supporting 6 concurrent worker threads
+- **Performance Improvement**: 81 pages of content reduced from the original 3 hours to within 30 minutes, **performance improved by approximately 6x**
+- **Order Guarantee**: Through paragraph number sorting and write lock mechanism, ensures translation results are output in original order
+- **Smart Scheduling**: Supports flexible adjustment of concurrency through `Currency_Limit` environment variable (default 5, maximum does not exceed RPM, i.e., requests per minute limit)
 
 ### 🛡️ Exception Protection and Interruption Recovery
 - **Interactive Failure Recovery**: When the number of consecutive API failures reaches the limit, the program no longer exits directly, but pauses and offers options: users can choose to "reset failure count and continue retrying" or "save current progress and exit".
 - **Manual Interruption Protection**: Captures `Ctrl+C` interrupt signals to ensure that the accumulated glossary and remaining untranslated original text can be safely saved when the user manually stops the program.
 - **Resume Support**: The program automatically locates and saves the untranslated part as a `_rest.md` file, facilitating subsequent translation continuation.
 - **API Content Auto-Repair**: Implemented automatic detection and paragraph-level retry mechanisms for JSON format errors returned by the API, preventing program crashes caused by single parsing failures.
+
+### 🏗️ Core Architecture Refactoring
+- **Unified Translation Core**: Added `TranslationCore` module, unifying CLI and WebUI translation logic, eliminating code duplication
+- **Asynchronous Diagnostics**: Introduced non-blocking API diagnostics and global error state management, improving system stability
+- **Type Safety**: Unified terminology aggregation forms, resolving type inconsistency issues in concurrent environments
 
 ### 🚀 Interaction Experience and Terminology Management
 - **CLI Preference Memory**: Automatically loads the last used API platform, file path, and other configurations at startup; simply press Enter to reuse them.
@@ -67,26 +77,31 @@ AIwork4translator focuses on translating technical documents while preserving te
 ```
 project_root/
 ├── data/
-│   ├── .env
+│   ├── .env                 # Environment configuration (API keys, model parameters, etc.)
 │   └── README_en.md
 ├── models/
 │   └── dbmdz/bert-large-cased-finetuned-conll03-english-for-ner/
-├── modules/
+├── modules/                 # Unified business modules (core translation logic)
 │   ├── api_tool.py          # LLMService, returns (content, tokens), no RAG cache
 │   ├── config.py            # GlobalConfig (env-first)
 │   ├── read_tool.py         # Structured Markdown segmentation
 │   ├── count_tool.py        # Paragraph counting (mirrors segmentation logic)
 │   ├── csv_process_tool.py  # Aho-Corasick term matching & CSV validation
 │   ├── markitdown_tool.py   # Non-Markdown → Markdown conversion
-│   ├── write_out_tool.py    # Structured/flat writing (no "# end" by default)
-│   └── ner_list_tool.py     # Robust model path detection (prefers root models/)
-├── templates/
-│   ├── index.html
-│   └── editor.html
-├── static/
-│   ├── style.css
-│   ├── script.js
-│   └── editor.js
+│   ├── ner_list_tool.py     # Robust model path detection (prefers root models/)
+│   ├── terminology_tool.py  # Glossary management (save, merge, format)
+│   ├── translation_core.py  # Translation core engine (encapsulates unified translation workflow)
+│   └── write_out_tool.py    # Structured/flat writing (no "# end" by default)
+├── services/                # Service layer (async diagnostics, global state management)
+│   ├── __init__.py
+│   └── diagnostics.py       # Async diagnostics management (singleton pattern)
+├── templates/               # WebUI templates
+│   ├── index.html           # File upload page
+│   └── editor.html          # Two-column editor page
+├── static/                  # WebUI static resources
+│   ├── style.css            # Global styles
+│   ├── script.js            # Homepage interaction logic
+│   └── editor.js            # Editor and polling logic
 ├── uploads/
 ├── app.py                   # WebUI entry (provides main())
 ├── main.py                  # CLI entry (interactive, with preference persistence)
@@ -193,9 +208,8 @@ python -m pytest
 - v1.2.0: Core features completed (CLI, WebUI, provider support, unified modules).
 - Future versions:
   - Enhance Markdown parsing performance with MinerU.
-  - Add a CAT-like interactive table view (source/target aligned per sentence) for efficient editing.
-  - ~~Support real-time glossary updates: auto-adding unfamiliar terms during translation and allowing quick edits.~~ Completed: Dynamic Terminology Management (union matching, merge switch, new-term collection/export).
-  - ~~Improve empty glossary generation: include type plus translation suggestions for faster review.~~ New plan: temporarily deprecate blank glossary generation due to poor effectiveness; may be rebuilt or removed.
+  - Add a CAP-like interactive table view (source/target aligned per sentence) for efficient editing.
+
 
 ## Contact
 Email: chasen0315@gmail.com (reply within 24 hours by 2025-12-29)

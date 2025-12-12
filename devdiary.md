@@ -296,10 +296,63 @@
      - **无状态封装**：将 `main.py` 中重复的术语保存逻辑封装为 `modules/terminology_tool.py` 中的 `save_terms_result` 函数，统一了“合并保存”与“单独保存”的处理流程。
      - **文件名修复**：修复 `save_glossary_df` 函数在保存时丢失原文件名的 bug，输出格式规范为 `原文件名_时间戳.csv`。
   4. **测试覆盖增强**：
-     - 新增针对术语保存文件名、封装函数逻辑及未翻译部分定位算法的单元测试，覆盖 Setext 标题、重复关键词、中文 Unicode 字符等复杂场景。
+- 新增针对术语保存文件名、封装函数逻辑及未翻译部分定位算法的单元测试，覆盖 Setext 标题、重复关键词、中文 Unicode 字符等复杂场景。
+
+### 2025/12/11 - 并发架构迭代与队列监控、RPM管理修复
+- 文件修改：
+  - `main.py:109-145`（并发翻译循环重构、队列监控日志、并发数读取配置）
+  - `modules/read_tool.py`（新增 `read_and_process_structured_paragraphs_to_json`，一次性切分与短段落合并）
+  - `modules/write_out_tool.py:80-96`（结构化写出 `header_path` 健壮性检查，避免 `IndexError`）
+  - `modules/api_tool.py`（RPM 限流线程安全修复）
+  - `tests/test_concurrency_flow.py`（新增并发流程与短段合并测试）
+  - `data/.env`（新增并发控制项 `Currency_Limit`）
+- 主要更新：
+  1. 并发架构由 `Semaphore + as_completed` 调整为 `asyncio.Queue + Worker Pool`，确保任务按段落顺序被取用，避免出现后段率先开始的问题。
+  2. 在并发模式中引入中间 JSON（`*_intermediate.json`），包含 `paragraph_number/meta_data/content/...`，翻译完成后按 `tracker_state['next_id']` 顺序落盘，保证写入有序且无冲突。
+  3. `Currency_Limit` 驱动并发工作池大小，默认 5，支持在 `.env` 中统一调控。
+  4. 队列监控与调试日志：为每个 Worker 添加启动/取任务/完成/队列为空退出日志；在段落任务开始时输出 `[段落{p_id}] 开始翻译...`，提升可观测性。
+  5. RPM 管理修复：为 `LLMService` 增加互斥锁与安全计数，修复并发场景下每分钟请求数限制不生效的问题，同时不影响“流式竞赛”模式。
+  6. 写出健壮性：`write_out_tool.py` 在结构化模式下对 `meta_data.header_path` 做类型与长度校验，避免并发下偶发 `IndexError`。
+- 测试与验证：
+  - `tests/test_concurrency_flow.py` 验证并发循环在 mock API 下的总 tokens 统计、写出调用次数与术语累积；覆盖短段落合并的期望输出（3 段）。
+  - 引入 `pytest-asyncio` 以支持异步测试；在 `.venv` 环境中运行 `python -m pytest` 通过。
+- 设计动因与效果：
+  - 解决用户反馈的“段落 52 完成而段落 17 才开始”的调度异常；新架构保证任务取用顺序与写出顺序一致，终端可通过队列日志直观看到并发健康状态。
+  - 保持“流式竞赛”优势，同时确保 RPM/写出顺序与结构化标题处理的稳定性。
+
+
+### 2025/12/11 - 核心架构重构与代码审查问题解决
+- **文件修改**：
+  - `main.py`（拆分超长函数，统一核心逻辑）
+  - `modules/translation_core.py`（新增，封装翻译核心逻辑）
+  - `services/diagnostics.py`（新增，异步诊断管理）
+  - `app.py`（适配新的TranslationCore）
+  - `.data/document/dev_order.md`（更新开发计划）
+- **主要更新**：
+  1. **解决CODE-001（核心逻辑重复）**：
+     - 抽象`TranslationCore.execute_translation_step()`统一CLI同步循环与并发Worker的翻译逻辑
+     - 通过依赖注入`LLMService`实现可测试性，使用`asyncio.to_thread`避免阻塞事件循环
+     - 封装术语匹配、Prompt构造、API调用/重试、JSON修复、术语复写等完整流程
+  2. **解决CODE-002（main()函数过长）**：
+     - 将`main()`拆分为`get_user_config()`、`run_sync_translation_loop()`、`finalize_process()`等专注函数
+     - 使用`@dataclass`提升配置可读性，职责分离明确
+  3. **解决ARCH-003（缺少异步API诊断）**：
+     - 新增`safediagnostics`模块，实现单例`DiagnosticsManager`管理全局错误状态
+     - 在并发模式下添加非阻塞诊断流程，避免Worker失败时重复诊断
+  4. **解决ARCH-004（aggregated_new_terms类型不一致）**：
+     - 统一并发路径中的术语聚合形态：使用`aggregated_new_terms_dict`进行核心匹配，通过写锁同步更新
+     - 删除main.py:228-266中的无效占位代码，确保类型一致性
+  5. **代码质量提升**：
+     - 新增`tests/test_translation_core.py`（4个单元测试）验证核心模块功能
+     - 修复多个过时测试用例，确保测试套件与代码变更同步
+     - 保留NER空白术语表生成代码作为未来开发基础
+- **验证结果**：
+  - 所有新增测试通过，无回归问题
+  - 并发流程测试与核心模块测试均正常
+  - CLI与WebUI统一使用TranslationCore，消除逻辑分裂
 
 ## 最后更新时间
-2025/12/09
+2025/12/12
 
 ## 项目结构概览（合并后）
 

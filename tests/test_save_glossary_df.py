@@ -47,6 +47,10 @@ class DummyPd:
     class DataFrame:
         def __init__(self, rows):
             self._rows = rows
+            keys = set()
+            for r in rows:
+                keys.update(r.keys())
+            self.columns = list(keys)
 
         def __getitem__(self, keys):
             if isinstance(keys, list):
@@ -83,4 +87,3 @@ def test_save_glossary_df_dataframe_branch_preserves_basename(tmp_path, monkeypa
     rows = read_csv_rows(out_path)
     assert rows[0] == ["term", "translation"]
     assert rows[1] == ["Night City", "夜之城"]
-

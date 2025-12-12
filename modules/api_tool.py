@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import threading
 from typing import Dict, Any, List, Union
 from abc import ABC, abstractmethod
 from openai import OpenAI
@@ -79,12 +80,12 @@ class DeepseekProvider(LLMProvider):
         )
         return completion.choices[0].message.content, completion.usage.total_tokens # type: ignore
 
-class SilliconProvider(LLMProvider):
+class SiliconProvider(LLMProvider):
     def __init__(self):
-        base_url = os.getenv('SILLICON_JSON_URL') or 'https://api.siliconflow.com/v1'
-        api_key = os.getenv('SILLICON_API_KEY')
+        base_url = os.getenv('SILICON_JSON_URL') or 'https://api.siliconflow.com/v1'
+        api_key = os.getenv('SILICON_API_KEY')
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.model = os.getenv('SILLICON_JSON_MODEL', 'deepseek-ai/DeepSeek-V2.5')
+        self.model = os.getenv('SILICON_JSON_MODEL', 'deepseek-ai/DeepSeek-V2.5')
 
     def generate_completion(self, prompt: str, system_prompt: str):
         completion = self.client.chat.completions.create(
@@ -233,7 +234,7 @@ class LLMService:
             "kimi": KimiProvider,
             "gpt": GPTProvider,
             "deepseek": DeepseekProvider,
-            "sillicon": SilliconProvider,
+            "silicon": SiliconProvider,
             "gemini": GeminiProvider,
             "doubao": DoubaoProvider,
         }
@@ -243,6 +244,7 @@ class LLMService:
         self.structured = os.getenv('STRUCTURED_OUTPUT', 'True').lower() in ('1', 'true', 'yes')
         self._rpm_limit = int(os.getenv('Requests_Per_Minute', '0'))
         self._req_ts: List[float] = []
+        self._lock = threading.Lock()
 
     @property
     def provider(self):
@@ -275,6 +277,24 @@ class LLMService:
         self._enforce_rate_limit()
         response_obj, _ = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
         parsed = parse_translation_response(response_obj)
+        return parsed
+
+    def rewrite_with_glossary(self, translation: str, notes: str, corrections: Dict[str, str]) -> Dict[str, Any]:
+        if not corrections:
+            return {"translation": translation, "notes": notes, "newterminology": []}
+        terms_info = '\n'.join([f"{eng} -> {chi}" for eng, chi in corrections.items()])
+        prompt = (
+            "请根据以下术语映射，复写现有译文与注释，使其中的术语全部采用映射中的译名；"
+            "保持语义与行文不变，只进行术语规范化。"
+            "仅输出JSON，包含translation、notes两个字符串内容和名为newterminology的空数组。\n"
+            f"术语映射：\n{terms_info}\n"
+            f"现有译文：\n{translation}\n"
+            f"现有注释：\n{notes}"
+        )
+        self._enforce_rate_limit()
+        content, _ = self.Linkedprovider.generate_completion(prompt, self.system_prompt or "你是术语一致性编辑助手")
+        parsed = parse_translation_response(content)
+        parsed["newterminology"] = []
         return parsed
 
     def test_api(self) -> Dict[str, Any]:
@@ -313,12 +333,21 @@ class LLMService:
     def _enforce_rate_limit(self) -> None:
         if self._rpm_limit <= 0:
             return
-        now = time.time()
-        self._req_ts = [t for t in self._req_ts if now - t < 60.0]
-        if len(self._req_ts) >= self._rpm_limit:
-            wait = 60.0 - (now - self._req_ts[0])
+            
+        while True:
+            with self._lock:
+                now = time.time()
+                # Clean up expired timestamps
+                self._req_ts = [t for t in self._req_ts if now - t < 60.0]
+                
+                if len(self._req_ts) < self._rpm_limit:
+                    self._req_ts.append(now)
+                    return # Slot acquired
+                
+                # Calculate wait time
+                wait = 60.0 - (now - self._req_ts[0])
+            
+            # Sleep outside the lock to avoid blocking other threads
+            # (though they will likely hit the limit too)
             if wait > 0:
                 time.sleep(wait)
-            now = time.time()
-            self._req_ts = [t for t in self._req_ts if now - t < 60.0]
-        self._req_ts.append(time.time())
