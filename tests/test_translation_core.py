@@ -8,9 +8,9 @@ def mock_llm_service():
     service = MagicMock()
     # call_ai_model_api is called via to_thread, so it should be sync in mock
     service.create_prompt.return_value = "mock_prompt"
-    service.call_ai_model_api.return_value = ({"translation": "T", "notes": "N", "newterminology": []}, 100)
-    service.repair_json.return_value = {"translation": "RT", "notes": "RN", "newterminology": []}
-    service.rewrite_with_glossary.return_value = {"translation": "RW", "notes": "RN", "newterminology": []}
+    service.call_ai_model_api.return_value = ({"translation": "T", "notes": "N", "new_terms": []}, 100)
+    service.repair_json.return_value = {"translation": "RT", "notes": "RN", "new_terms": []}
+    service.rewrite_with_glossary.return_value = {"translation": "RW", "notes": "RN", "new_terms": []}
     return service
 
 @pytest.mark.asyncio
@@ -30,7 +30,7 @@ async def test_execute_translation_step_success(mock_llm_service):
 @pytest.mark.asyncio
 async def test_execute_translation_step_retry(mock_llm_service):
     # First call fails, second succeeds
-    mock_llm_service.call_ai_model_api.side_effect = [Exception("Net Error"), ({"translation": "T2", "notes": "", "newterminology": []}, 50)]
+    mock_llm_service.call_ai_model_api.side_effect = [Exception("Net Error"), ({"translation": "T2", "notes": "", "new_terms": []}, 50)]
     
     core = TranslationCore(mock_llm_service)
     result = await core.execute_translation_step({"content": "text", "meta_data": {}}, {}, {})
@@ -44,7 +44,7 @@ async def test_json_repair(mock_llm_service):
     # API returns error dict
     mock_llm_service.call_ai_model_api.return_value = ({"error": "Invalid JSON", "origin_text": "bad json"}, 10)
     # Repair succeeds
-    mock_llm_service.repair_json.return_value = {"translation": "Fixed", "notes": "", "newterminology": []}
+    mock_llm_service.repair_json.return_value = {"translation": "Fixed", "notes": "", "new_terms": []}
     
     core = TranslationCore(mock_llm_service)
     result = await core.execute_translation_step({"content": "text", "meta_data": {}}, {}, {})
@@ -60,7 +60,7 @@ async def test_rewrite_with_glossary(mock_llm_service):
         {
             "translation": "Bad Term", 
             "notes": "", 
-            "newterminology": [{"term": "foo", "translation": "bar"}]
+            "new_terms": [{"term": "foo", "translation": "bar"}]
         }, 10
     )
     
@@ -70,7 +70,7 @@ async def test_rewrite_with_glossary(mock_llm_service):
     mock_llm_service.rewrite_with_glossary.return_value = {
         "translation": "Good Term",
         "notes": "",
-        "newterminology": []
+        "new_terms": []
     }
     
     core = TranslationCore(mock_llm_service)

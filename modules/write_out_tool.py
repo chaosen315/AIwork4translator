@@ -1,4 +1,4 @@
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 import re
 import json
 import os
@@ -70,7 +70,11 @@ def write_to_markdown_through_json(
             if notes:
                 response = f"{trans}\n\n---\n\n{notes}\n\n---\n\n"
             
-            write_to_markdown(output_md_path, (response, candidate['meta_data']), mode)
+            meta_data = candidate['meta_data']
+            if meta_data and meta_data.get('is_continuation'):
+                meta_data = None
+            
+            write_to_markdown(output_md_path, (response, meta_data), mode)
             
             tracker_state['next_id'] += 1
             # print(f"[System] 已写入段落 {next_id}") # Optional logging
@@ -79,23 +83,18 @@ def write_to_markdown_through_json(
 
 def write_to_markdown(
     output_file_path: str,
-    content: Union[str, Tuple[str, dict]],
+    content: Union[str, Tuple[str, Optional[dict]]],
     mode: str = "flat"
 ) -> None:
     paragraph_text, metadata = _parse_content(content, mode)
-    current_header = _find_last_header_in_file(output_file_path)
+    # current_header = _find_last_header_in_file(output_file_path) # Removed as no longer needed for header check
     with open(output_file_path, 'a', encoding='utf-8') as file:
         if metadata and mode != 'flat':
-            # 结构化模式下，检查标题是否与当前文件中倒数第二个标题，即最后一个英文标题相同，如果相同，则只写入content，不写入标题
-            header_path = metadata.get('header_path')
-            if header_path and isinstance(header_path, list) and len(header_path) >= 2 and current_header == header_path[-2]:
-                file.write(f"\n{paragraph_text}\n")
-            else:
-                _write_structured_section(file, paragraph_text, metadata)
+            _write_structured_section(file, paragraph_text, metadata)
         else:
             file.write(f"\n{paragraph_text}\n")
 
-def _parse_content(content, mode) -> Tuple[str, dict]:
+def _parse_content(content, mode) -> Tuple[str, Optional[dict]]:
     if mode == 'flat':
         if isinstance(content, tuple):
             return content[0], None

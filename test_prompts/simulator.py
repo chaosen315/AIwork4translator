@@ -109,14 +109,14 @@ class TranslationSimulator:
                 translation = response_obj.get('translation', '')
                 notes = response_obj.get('notes', '')
                 print(type(notes))
-                new_terms = response_obj.get('newterminology', [])
+                new_terms = response_obj.get('new_terms', [])
                 aggregated_new_terms.extend(new_terms)
                 joined = "\n\n---\n\n".join([translation, notes])
 
                 print(f"✅ 翻译成功 (tokens: {tokens})")
 
                 # 分析输出格式
-                format_analysis = self._analyze_output_format(joined)
+                format_analysis = self._analyze_output_format(joined, new_terms)
 
                 segment_results.append({
                     'segment_id': seg_idx,
@@ -124,7 +124,7 @@ class TranslationSimulator:
                     'translation_joined': joined,
                     'translation': translation,
                     'notes': notes,
-                    'newterminology': new_terms,
+                    'new_terms': new_terms,
                     'tokens': tokens,
                     'format_analysis': format_analysis,
                     'success': True
@@ -200,7 +200,7 @@ class TranslationSimulator:
         
         return segments
     
-    def _analyze_output_format(self, joined_text: str) -> Dict:
+    def _analyze_output_format(self, joined_text: str, new_terms: Optional[List] = None) -> Dict:
         analysis = {
             'has_main_text': False,
             'has_footnotes': False,
@@ -234,10 +234,18 @@ class TranslationSimulator:
             analysis['footnotes'] = footnotes
             analysis['has_main_text'] = bool(main_text)
             analysis['has_footnotes'] = bool(footnotes)
-            bullet = any(l.strip().startswith('-') for l in footnotes.splitlines())
-            analysis['format_correct'] = analysis['has_main_text'] and analysis['has_footnotes'] and bullet
-            if not bullet:
-                analysis['issues'].append('译注未使用列表格式')
+            
+            if not footnotes:
+                if new_terms:
+                    analysis['format_correct'] = False
+                    analysis['issues'].append('有新术语但译注为空')
+                else:
+                    analysis['format_correct'] = analysis['has_main_text']
+            else:
+                bullet = any(l.strip().startswith('-') for l in footnotes.splitlines())
+                analysis['format_correct'] = analysis['has_main_text'] and bullet
+                if not bullet:
+                    analysis['issues'].append('译注未使用列表格式')
         else:
             analysis['main_text'] = text
             analysis['has_main_text'] = True

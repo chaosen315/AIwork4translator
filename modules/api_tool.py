@@ -1,3 +1,4 @@
+from typing import Tuple
 import os
 import json
 import time
@@ -42,7 +43,6 @@ class GPTProvider(LLMProvider):
         self.model = os.getenv('GPT_MODEL', 'gpt-realtime')
 
     def generate_completion(self, prompt: str, system_prompt: str):
-        schema = translation_json_schema()
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -50,14 +50,7 @@ class GPTProvider(LLMProvider):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "translation_response",
-                    "strict": True,
-                    "schema": schema
-                }
-            }
+            response_format={"type": "json_object"}
         )
         return completion.choices[0].message.content, completion.usage.total_tokens # type: ignore
 
@@ -122,29 +115,31 @@ class GeminiProvider(LLMProvider):
 class DoubaoProvider(LLMProvider):
     def __init__(self):
         base_url = os.getenv('DOUBAO_BASE_URL')
-        api_key = f"Bearer {os.getenv('DOUBAO_API_KEY')}"
+        api_key = os.getenv('DOUBAO_API_KEY')
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = os.getenv('DOUBAO_MODEL', 'doubao-seed-1-6-251015')
 
     def generate_completion(self, prompt: str, system_prompt: str):
-        completion = self.client.chat.completions.create(
+        response = self.client.responses.parse(
             model=self.model,
-            messages=[
+            input=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            response_format={"type": "json_object"}
+            text_format=TranslationResponseModel,
+            extra_body={
+                "thinking": {"type": "disabled"} # 不使用深度思考能力
+            }
         )
-        return completion.choices[0].message.content, completion.usage.total_tokens # type: ignore
+        return response.output_text, response.usage.total_tokens # type: ignore
 
 def translation_json_schema() -> Dict[str, Any]:
     return {
         "type": "object",
         "properties": {
             "translation": {"type": "string"},
-            "notes": {"type": "string"},
-            "newterminology": {
+            "new_terms": {
                 "type": "array",
                 "items": {
                     "type": "object",
@@ -158,7 +153,7 @@ def translation_json_schema() -> Dict[str, Any]:
                 }
             }
         },
-        "required": ["translation", "notes", "newterminology"],
+        "required": ["translation", "new_terms"],
         "additionalProperties": False
     }
 
@@ -169,17 +164,7 @@ class NewTerm(BaseModel):
 
 class TranslationResponseModel(BaseModel):
     translation: str
-    notes: str
-    newterminology: List[NewTerm]
-
-    @field_validator('notes', mode='before')
-    @classmethod
-    def _normalize_notes(cls, v):
-        if isinstance(v, list):
-            return "\n".join([n if str(n).strip().startswith('-') else f"- {n}" for n in v])
-        if isinstance(v, str):
-            return v
-        return str(v or '')
+    new_terms: List[NewTerm]
 
 class StructuredParseError(Exception):
     pass
@@ -210,21 +195,30 @@ def parse_translation_response(text: str) -> Dict[str, Any]:
         except Exception:
             raise StructuredParseError('Non-structured or invalid JSON output')
     data = model.model_dump() if hasattr(model, 'model_dump') else model.dict()
-    notes_val = data.get("notes", "")
-    if isinstance(notes_val, list):
-        normalized_notes = "\n".join([n if str(n).strip().startswith('-') else f"- {n}" for n in notes_val])
-    else:
-        normalized_notes = str(notes_val)
+    
+    new_terms = data.get("new_terms", [])
+    notes_list = []
+    for nt in new_terms:
+        t = nt.get("translation", "")
+        o = nt.get("term", "")
+        r = nt.get("reason", "")
+        if t and o:
+            notes_list.append(f"- {t} (原文: {o})：{r}")
+        elif o:
+             notes_list.append(f"- {o}：{r}")
+    
+    normalized_notes = "\n".join(notes_list)
+
     return {
         "translation": data.get("translation", ""),
         "notes": normalized_notes,
-        "newterminology": [
+        "new_terms": [
             {
                 "term": nt.get("term", ""),
                 "translation": nt.get("translation", ""),
                 "reason": nt.get("reason", ""),
             }
-            for nt in data.get("newterminology", [])
+            for nt in new_terms
         ],
     }
 
@@ -270,32 +264,31 @@ class LLMService:
         if self.structured:
             parsed = parse_translation_response(content)
             return parsed, total_tokens
-        return {"translation": content, "notes": "", "newterminology": []}, total_tokens
+        return {"translation": content, "notes": "", "new_terms": []}, total_tokens
 
-    def repair_json(self, origin_text: str) -> Dict[str, Any]:
-        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:",r"{\"translation\": \"...\",\"notes\": [\"术语1：注释\",\"术语2：注释\"], \"newterminology\": [{\"term\": \"...\", \"translation\": \"...\", \"reason\": \"...\"}]}。"])
+    def repair_json(self, origin_text: str) -> Tuple[Dict[str, Any], int]:
+        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:",r"{\"translation\": \"...\", \"new_terms\": [{\"term\": \"...\", \"translation\": \"...\", \"reason\": \"...\"}]}。"])
         self._enforce_rate_limit()
-        response_obj, _ = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
+        response_obj, total_tokens = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
         parsed = parse_translation_response(response_obj)
-        return parsed
+        return parsed, total_tokens
 
-    def rewrite_with_glossary(self, translation: str, notes: str, corrections: Dict[str, str]) -> Dict[str, Any]:
+    def rewrite_with_glossary(self, translation: str, notes: str, corrections: Dict[str, str]) -> Tuple[Dict[str, Any], int]:
         if not corrections:
-            return {"translation": translation, "notes": notes, "newterminology": []}
+            return {"translation": translation, "notes": notes, "new_terms": []}, 0
         terms_info = '\n'.join([f"{eng} -> {chi}" for eng, chi in corrections.items()])
         prompt = (
-            "请根据以下术语映射，复写现有译文与注释，使其中的术语全部采用映射中的译名；"
+            "请根据以下术语映射，复写现有译文，使其中的术语全部采用映射中的译名；"
             "保持语义与行文不变，只进行术语规范化。"
-            "仅输出JSON，包含translation、notes两个字符串内容和名为newterminology的空数组。\n"
+            "仅输出JSON，包含translation和new_terms（请根据现有注释还原，并移除已在术语映射中修正的项）。\n"
             f"术语映射：\n{terms_info}\n"
             f"现有译文：\n{translation}\n"
             f"现有注释：\n{notes}"
         )
         self._enforce_rate_limit()
-        content, _ = self.Linkedprovider.generate_completion(prompt, self.system_prompt or "你是术语一致性编辑助手")
+        content, total_tokens = self.Linkedprovider.generate_completion(prompt, self.system_prompt or "你是术语一致性编辑助手")
         parsed = parse_translation_response(content)
-        parsed["newterminology"] = []
-        return parsed
+        return parsed, total_tokens
 
     def test_api(self) -> Dict[str, Any]:
         results = {
@@ -305,9 +298,9 @@ class LLMService:
             "error": None,
         }
         test_cases = [
-            {"name": "简单翻译", "prompt": "请以JSON输出：translation、notes、newterminology。内容：Hello, this is a simple test for API functionality."},
-            {"name": "专有术语翻译", "prompt": "请以JSON输出：translation、notes、newterminology。内容：Night City is a dangerous place in Cyberpunk 2077."},
-            {"name": "长句翻译", "prompt": "请以JSON输出：translation、notes、newterminology。内容：In the vast expanse of the digital frontier, where information flows like a river and technology evolves at an unprecedented pace, we find ourselves navigating through a landscape of endless possibilities and unforeseen challenges."},
+            {"name": "简单翻译", "prompt": "请以JSON输出：translation、new_terms。内容：Hello, this is a simple test for API functionality."},
+            {"name": "专有术语翻译", "prompt": "请以JSON输出：translation、new_terms。内容：Night City is a dangerous place in Cyberpunk 2077."},
+            {"name": "长句翻译", "prompt": "请以JSON输出：translation、new_terms。内容：In the vast expanse of the digital frontier, where information flows like a river and technology evolves at an unprecedented pace, we find ourselves navigating through a landscape of endless possibilities and unforeseen challenges."},
         ]
         for case in test_cases:
             try:
