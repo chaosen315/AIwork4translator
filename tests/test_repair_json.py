@@ -25,7 +25,7 @@ def _sample_valid_json():
     return {
         "translation": "你好，世界",
         "notes": ["术语1：注释", "术语2：注释"],
-        "newterminology": [
+        "new_terms": [
             {"term": "Night City", "translation": "夜之城", "reason": "赛博朋克特定名词"}
         ],
     }
@@ -51,7 +51,7 @@ def test_repair_json_triggered_when_invalid_json(monkeypatch):
         return {
             "translation": "修复后的译文",
             "notes": "- 术语1：注释\n- 术语2：注释",
-            "newterminology": [],
+            "new_terms": [],
         }
 
     monkeypatch.setattr(llm_service, "repair_json", spy_repair_json)
@@ -81,7 +81,7 @@ def test_repair_json_effective_with_valid_fix(monkeypatch):
     assert result.get("translation") == fixed_json["translation"]
     notes = result.get("notes", "")
     assert "- 术语1：注释" in notes and "- 术语2：注释" in notes
-    newterms = result.get("newterminology", [])
+    newterms = result.get("new_terms", [])
     assert len(newterms) == 1
     assert newterms[0]["term"] == "Night City"
     assert newterms[0]["translation"] == "夜之城"

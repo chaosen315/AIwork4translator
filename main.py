@@ -50,9 +50,13 @@ def get_user_config() -> UserConfig:
             prefs = {}
             
     # 1. 选择 Provider
+    service = LLMService()
+    provider_list = list(service.providers.keys())
+    provider_str = '","'.join(provider_list)
+
     while True:
         default_provider = prefs.get("last_provider")
-        provider_prompt = "需要确认API平台（\"kimi\",\"gpt\",\"deepseek\",\"silicon\",\"gemini\"）。"
+        provider_prompt = f'需要确认API平台（"{provider_str}"）。'
         if default_provider:
             provider_prompt += f"上一次使用{default_provider}，如继续使用请按回车，如有更换请输入："
         else:
@@ -111,7 +115,7 @@ def get_user_config() -> UserConfig:
                     exit(0)
                 else:
                     print("输入无效，请输入y或n")
-            config.preserve_structure = False # 转换后的文件通常不适合强结构化假设
+            # config.preserve_structure = False 转换后的文件通常不适合强结构化假设，但已通过一些办法处理
             config.input_md_file = input_md_file
         else:
             config.input_md_file = input_file
@@ -203,9 +207,20 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
         if k:
             aggregated_new_terms_dict[k] = v
     
+    consecutive_failures = 0
+    
     async def worker(worker_id):
+        nonlocal consecutive_failures
         print(f"[System] Worker-{worker_id} 启动")
         while True:
+            # 检查全局错误状态或连续失败次数
+            is_err, _ = global_diagnostics.get_global_error_state()
+            if is_err or consecutive_failures >= int(os.getenv('MAX_RETRIES', 3)) + 2:
+                if not is_err:
+                     print(f"[System] 监测到连续失败次数过多 ({consecutive_failures})，停止所有任务。")
+                     global_diagnostics.set_global_error_state(True, "Too many consecutive failures")
+                break
+
             try:
                 segment = queue.get_nowait()
             except asyncio.QueueEmpty:
@@ -224,12 +239,15 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
                 )
                 
                 if not result.success:
+                    consecutive_failures += 1
                     print(f"[System] Worker-{worker_id} 段落 {p_id} 失败: {result.error}")
                     # 触发诊断
                     asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
-                    queue.task_done()
+                    # 注意：这里不要调用 queue.task_done()，统一由 finally 处理
                     continue
 
+                # 成功则重置连续失败计数
+                consecutive_failures = 0
                 stats['total_tokens'] += result.tokens
                 
                 
@@ -261,6 +279,7 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
                 print(f"[System] Worker-{worker_id} 完成段落 {p_id}")
 
             except Exception as e:
+                consecutive_failures += 1
                 print(f"[System] Error in Worker-{worker_id} processing segment: {e}")
                 asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
             finally:
@@ -270,6 +289,62 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
     print(f"[System] 初始化并发工作池，Worker数量: {concurrency_limit}")
     workers = [asyncio.create_task(worker(i+1)) for i in range(concurrency_limit)]
     await asyncio.gather(*workers)
+
+    # 熔断后尝试保存未翻译部分
+    is_err, _ = global_diagnostics.get_global_error_state()
+    if is_err:
+        print("[System] 任务因熔断停止，正在尝试保存未翻译部分...")
+        # 找出第一个未完成的段落
+        # 注意：paragraphs 已经排过序
+        # 我们需要找到第一个没有被成功写入（或标记完成）的段落
+        # 如果是 JSON 模式，我们可以检查 JSON 文件状态
+        # 如果不是，我们只能根据 queue 剩余或者 result 状态推断？
+        # 简单策略：遍历 paragraphs，找到第一个不在 aggregated_new_terms 且没有 content 的？
+        # 不对，aggregated_new_terms 是术语。
+        # 我们可以检查 queue 里的剩余任务，但这只能拿到未领取的。
+        # 已领取但失败的任务不在 queue 里。
+        # 更可靠的方法：如果 paragraphs 是有序列表，我们应该能找到第一个未完成的。
+        # 但我们没有状态标记回写到 paragraphs 列表里（除非是 JSON 模式且共享对象）。
+        
+        # 在 JSON 模式下，json_path 对应的文件会被更新。我们可以读取它。
+        if json_path and os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                info_list = data.get('text_info', [])
+                # 找第一个 pending
+                first_pending_idx = -1
+                for i, item in enumerate(info_list):
+                    if item.get('status') != 'completed':
+                        first_pending_idx = i
+                        break
+                
+                if first_pending_idx != -1:
+                    # 获取未翻译文本
+                    # 假设原始文件内容还在
+                    # save_untranslated 需要 input_md_file 等参数，但这里只有 run_translation_loop 的参数
+                    # 这是一个设计问题：run_translation_loop 缺少上下文。
+                    # 但我们可以尝试直接写出 rest.md，基于 remaining content
+                    
+                    # 构造 rest.md 内容
+                    rest_content = []
+                    for item in info_list[first_pending_idx:]:
+                        c = item.get('content', '')
+                        if c:
+                            rest_content.append(c)
+                    
+                    if rest_content:
+                        input_dir = os.path.dirname(output_md_file)
+                        base_name = os.path.splitext(os.path.basename(output_md_file))[0].replace('_output', '')
+                        rest_path = os.path.join(input_dir, f"{base_name}_rest.md")
+                        with open(rest_path, 'w', encoding='utf-8') as f:
+                            f.write("\n\n".join(rest_content))
+                        print(f"[System] 未翻译部分已保存至：{rest_path}")
+            except Exception as e:
+                print(f"[System] 保存未翻译部分失败: {e}")
+        else:
+             print("[System] 非JSON模式或文件缺失，暂不支持自动保存rest.md（建议使用Ctrl+C中断以触发兜底保存）。")
+
     return stats['total_tokens']
 
 async def safe_api_diagnostics(llm_service: LLMService):
