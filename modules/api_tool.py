@@ -30,7 +30,7 @@ class KimiProvider(LLMProvider):
                 {"role": "user", "content": prompt},
                 {"role": "assistant", "content": "{", "partial": True} # type: ignore
             ],
-            temperature=0.1,
+            temperature=0.7,
         )
         content = "{" + (completion.choices[0].message.content or "")
         return content, completion.usage.total_tokens # type: ignore
@@ -49,7 +49,7 @@ class GPTProvider(LLMProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1,
+            temperature=1.0,
             response_format={"type": "json_object"}
         )
         return completion.choices[0].message.content, completion.usage.total_tokens # type: ignore
@@ -68,7 +68,7 @@ class DeepseekProvider(LLMProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1,
+            temperature=0.6,
             response_format={"type": "json_object"}
         )
         return completion.choices[0].message.content, completion.usage.total_tokens # type: ignore
@@ -107,7 +107,7 @@ class GeminiProvider(LLMProvider):
                 response_json_schema=TranslationResponseModel.model_json_schema(),
                 system_instruction=system_prompt,
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
-                temperature=0.1,
+                temperature=1.0,
             )
         )
         return response.text, response.usage_metadata.total_token_count # type: ignore
@@ -126,7 +126,7 @@ class DoubaoProvider(LLMProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1,
+            temperature=0.7,
             text_format=TranslationResponseModel,
             extra_body={
                 "thinking": {"type": "disabled"} # 不使用深度思考能力
@@ -267,7 +267,8 @@ class LLMService:
         return {"translation": content, "notes": "", "new_terms": []}, total_tokens
 
     def repair_json(self, origin_text: str) -> Tuple[Dict[str, Any], int]:
-        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:",r"{\"translation\": \"...\", \"new_terms\": [{\"term\": \"...\", \"translation\": \"...\", \"reason\": \"...\"}]}。"])
+        format = r"{'translation':'...','new_terms':[{'term': '...','translation':'...','reason':'...'}]}"
+        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:{format}。"])
         self._enforce_rate_limit()
         response_obj, total_tokens = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
         parsed = parse_translation_response(response_obj)

@@ -5,7 +5,13 @@
 
 Precise technical-document translation powered by glossary-aware prompts and robust Markdown segmentation. This project provides both CLI and WebUI with a unified module layer.
 
-## Latest Update (2025/12/12)
+## Latest Update (2025/12/24)
+
+### 🔍 Mid-Page Sentence Continuation Detection (English Papers)
+Added sentence-continuation detection optimized for English academic papers:
+- **Mid-page break heuristic**: Uses hard veto + scoring to avoid false merges (e.g., sentence-ending punctuation, abbreviation endings)
+- **Skip image blocks**: Merge logic can skip image segments to avoid treating non-text as merge candidates
+- **Preserve ordering**: Skipped image blocks are kept in the correct relative position to maintain document structure
 
 ### ⚡ Major Concurrency Performance Breakthrough
 We have implemented a brand-new concurrent translation architecture, bringing significant performance improvements:
@@ -205,10 +211,26 @@ python -m pytest
 - 2025-11-29: Unified root structure (merged CLI/WebUI), removed RAG cache, aligned modules, updated script entries, cleaned legacy directories
 
 ## Roadmap
-- v1.2.0: Core features completed (CLI, WebUI, provider support, unified modules).
-- Future versions:
-  - Enhance Markdown parsing performance with MinerU.
-  - Add a CAP-like interactive table view (source/target aligned per sentence) for efficient editing.
+### High Priority
+- **Async rate limiter**: Introduce an async RPM limiter based on `asyncio.Semaphore` + a time window to reduce threadpool blocking under concurrency
+- **Fallback for non-JSON mode**: Add lightweight progress markers (e.g., queue index mirror) to unify `rest.md` fallback behavior outside JSON mode
+- **Mid-page break algorithm**: Extend the signal set (quotes, parentheses, colon continuations) to improve edge cases like proper nouns / uppercase continuations
+
+### Medium Priority
+- **Image reinsertion strategy**: Extract reinsertion as a strategy (e.g., "follow text", "preserve relative position", "collect at section end") for different publishing formats
+- **Header stack refactor**: Move header-stack state to a dedicated context (e.g., tracker state / write context) for clarity and testability
+- **Batch processing**: Add chunked processing / rolling windows to reduce peak memory usage on very large documents
+
+### Low Priority
+- **Config contract docs**: Clarify key `.env` items and provider behavior differences
+- **MinerU integration**: Enhance Markdown parsing performance with MinerU
+- **CAP-like interaction**: Add a table-style UI (sentence-aligned source/target) for efficient editing
+
+### Completed (2025/12/24)
+- ✅ Mid-page sentence continuation detection + image skipping merge
+- ✅ Queue-based worker-pool concurrency architecture
+- ✅ API auto-repair + two-level JSON degradation strategy
+- ✅ CLI preference memory + dynamic glossary management
 
 
 ## Contact

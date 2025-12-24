@@ -105,3 +105,7 @@ packages = ["modules", "services"]
 program-translator-cli = "main:main"
 program-translator-webui = "app:main"
 program-translator-install-deps = "scripts.install_dependencies:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

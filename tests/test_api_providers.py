@@ -23,6 +23,19 @@ def test_api_provider_availability(provider_class, provider_name):
     """
     测试各个API provider的可用性，通过真实调用API进行翻译测试
     """
+    # 检查环境变量是否存在
+    env_var_map = {
+        "kimi": "KIMI_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "silicon": "SILICON_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+        "doubao": "DOUBAO_API_KEY"
+    }
+    
+    env_key = env_var_map.get(provider_name)
+    if not env_key or not os.getenv(env_key):
+        pytest.skip(f"Skipping {provider_name} test: {env_key} not found in environment")
+
     try:
 
         # 初始化provider

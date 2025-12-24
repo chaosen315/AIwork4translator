@@ -11,6 +11,7 @@
 
 ## 开发时间线记录
 
+
 ### 2025/11/9 21:24:08 - MarkItDown工具优化（命令行版本）
 - **文件修改**：src/modules/markitdown_tool.py
 - **主要更新**：
@@ -320,7 +321,6 @@
   - 解决用户反馈的“段落 52 完成而段落 17 才开始”的调度异常；新架构保证任务取用顺序与写出顺序一致，终端可通过队列日志直观看到并发健康状态。
   - 保持“流式竞赛”优势，同时确保 RPM/写出顺序与结构化标题处理的稳定性。
 
-
 ### 2025/12/11 - 核心架构重构与代码审查问题解决
 - **文件修改**：
   - `main.py`（拆分超长函数，统一核心逻辑）
@@ -346,13 +346,73 @@
      - 新增`tests/test_translation_core.py`（4个单元测试）验证核心模块功能
      - 修复多个过时测试用例，确保测试套件与代码变更同步
      - 保留NER空白术语表生成代码作为未来开发基础
+  6. **系统鲁棒性增强**：
+     - 修复`TranslationCore`中`rewrite_with_glossary`方法缺失导致的Worker崩溃问题（增加`hasattr`防御性检查）
 - **验证结果**：
   - 所有新增测试通过，无回归问题
   - 并发流程测试与核心模块测试均正常
   - CLI与WebUI统一使用TranslationCore，消除逻辑分裂
 
+### 2025/12/17 - 段落续写写出与翻译降级策略优化
+- **文件修改**：
+  - `modules/write_out_tool.py`
+  - `modules/translation_core.py`
+  - `tests/test_write_out_tool.py`
+  - `tests/test_translation_core.py`
+  - `tests/test_translation_core_fallback.py`
+  - `tests/test_api_providers.py`
+- **主要更新**：
+  1. **结构化写出与续写段落处理**：
+     - 调整 `write_to_markdown` 的参数签名，使 `content` 支持 `(text, meta_data)` 形式，其中 `meta_data` 可为 `None`；当中间 JSON 中标记 `meta_data.is_continuation=True` 时，写出端仅续写正文，不再重复写入标题，修复多段落合并后标题重复的问题。
+     - 移除基于 `header_path` 的重复标题检查，将是否写入标题完全交由 `is_continuation` 控制，简化分支逻辑并避免中英文标题栈错判。
+     - 新增并更新续写相关单元测试，覆盖 `_intermediate.json` 中连续段落在最终 Markdown 中按预期合并的场景。
+  2. **翻译结果降级策略与健壮性增强**：
+     - 在 `TranslationCore` 中，当达到 `max_api_retries` 仍无法得到完全合法的 JSON 时，如果最后一次响应中 `translation` 字段完整，则返回该译文并在 `notes` 中附加“注意：该段落译注、术语录入异常。”警告；若原始 `notes` 字段也合法，则在原有备注后追加“\n注意：该段落术语录入异常。”。
+     - 降级逻辑会显式跳过带有 `error` 字段的响应，防止包含错误信息的 payload 被误认为部分有效结果写入 Markdown。
+     - 补充一条针对 `{"origin_text": text, "error": "Invalid JSON format"}` 响应的降级路径：当 JSON 修复多次失败但 `origin_text` 中仍包含完整的 `translation`/`notes` 字段时，使用正则从原始文本中提取译文与注释，并解码常见转义字符（Markdown 文本中的 `\n`、`\"`、中英文引号等），在 `notes` 中追加“由降级逻辑解析（JSON 格式错误），可能存在排版问题。”提示。
+     - 将 `rewrite_with_glossary` 的错误处理与主翻译流程对齐：同样经过 JSON 合规性检查与 `repair_json` 修复重试，保证术语重写链路在返回结构异常时也能给出可降级的结果或明确失败。
+  3. **Provider 测试与类型提示对齐**：
+     - 修复 `DeepSeek` Provider 在测试环境下对 JSON 输出格式的严格要求，在测试提示词中补充“请以 JSON 格式返回翻译结果”，避免 BadRequest 错误干扰回归测试。
+     - 将 `modules/write_out_tool.py` 中 `_parse_content` 的返回类型从 `Tuple[str, dict]` 更新为 `Tuple[str, Optional[dict]]`，对齐实际运行时“可能无元数据”的返回形态，降低后续重构时的类型不一致风险。
+  4. **降级路径回归测试补强**：
+     - 新增 `tests/test_translation_core_fallback.py`，通过 `pytest`+`pytest-asyncio` 构造包含多种 Markdown 语法（粗体、斜体、行内代码）、中文引号、转义英文引号以及转义换行符的损坏 JSON（`Invalid JSON format` 场景），验证降级逻辑在复杂文本下仍能稳定还原译文，并正确追加警告信息。
+
+### 2025/12/18 - ReadTool合并逻辑增强与跨页断句修复
+- **文件修改**：
+  - `modules/read_tool.py`
+- **新增文件**：
+  - `tests/test_read_tool_merge_logic.py`
+- **主要更新**：
+  1. **智能跨页断句检测**：
+     - 新增 `_is_sentence_midpage_break` 函数，基于语言学规则（句末标点、缩写、连接词、首字母大小写等）精准检测英文论文中因分页导致的句子强行截断问题。
+  2. **增强型段落合并策略**：
+     - 重构 `read_and_process_structured_paragraphs_to_json` 的核心合并逻辑，引入了“向前查找”机制。
+     - **跳过图片合并**：当文本段落被图片打断时，算法能自动跳过中间的图片，尝试合并前后的文本内容。
+     - **图片位置保持**：被跳过的图片会被暂存，并在合并后的文本块之后依序回填，严格保持文档的视觉顺序。
+     - **连续合并支持**：支持级联合并（如 Text A + Text B + Text C），即使中间夹杂多个图片。
+  3. **双重合并条件**：
+     - 结合了“段落长度不足”（`min_chunk_size`）和“句子断裂检测”两种触发条件，确保碎片化的段落能被有效重组。
+  4. **代码可维护性提升**：
+     - 全面重写了核心处理函数的文档字符串和内部注释，清晰阐述了原子段落获取、数据标准化及复杂合并逻辑的实现细节。
+- **验证与结果**：
+  - 新增专用测试套件 `tests/test_read_tool_merge_logic.py`。
+  - 验证通过了以下场景：跳过图片合并文本、保留图片顺序、连续多段合并、基于断句规则的合并、以及边界鲁棒性测试。
+  - 解决了学术论文翻译中常见的“跨页断句”和“图片打断正文”痛点，显著提升了输入给 LLM 的上下文连贯性。
+
+### 2025/12/18 - 模型输出重构与交互优化
+- **主要更新**:
+  1. **模型结构化输出重构**:
+     - **文件修改**: `modules/api_tool.py`, `data/.env`
+     - **核心逻辑**: 移除了LLM返回JSON中的`notes`字段，改为在`parse_translation_response`函数中根据`new_terms`列表动态生成`notes`字符串，以简化模型输出并降低token消耗。同时更新了`.env`中的提示词，消除了`notes`字段的存在痕迹。
+  2. **仿真器验证逻辑改进**:
+     - **文件修改**: `test_prompts/simulator.py`
+     - **核心逻辑**: 改进了`_analyze_output_format`方法，正确处理了当译注（footnotes）和新术语（new-terms）均为空时的验证逻辑，将其视为合规情况，避免了误报。
+  3. **API平台选项动态化**:
+     - **文件修改**: `main.py`
+     - **核心逻辑**: 移除了硬编码的API平台选项，改为在程序启动时实例化`LLMService`，并从其`providers`属性中动态获取可用平台列表，从而自动生成交互提示，增强了代码的灵活性。
+
 ## 最后更新时间
-2025/12/12
+2025/12/19
 
 ## 项目结构概览（合并后）
 
@@ -361,17 +421,29 @@
   - `baseline.py`（统一 API 调用的基线示例）
   - `ner_list_check.py`（NER 词表生成工具）
   - `app.py`（WebUI 主入口，提供 `main()`）
+  - `evaluate.py`（评估与对比工具脚本）
+  - `test_main_prefs_integration.py`（主流程偏好集成测试）
+  - `test_webui_app.py`（WebUI 端到端测试）
 - 统一模块 `modules/`
-  - `api_tool.py`（LLMService 与供应商适配，返回 `content,tokens`，无 RAG 缓存）
-  - `config.py`（`GlobalConfig`，环境优先）
-  - `read_tool.py`、`count_tool.py`（结构化分段与计数，逻辑一致）
-  - `csv_process_tool.py`（CSV 校验与术语匹配）
-  - `markitdown_tool.py`（非 Markdown 转换）
-  - `write_out_tool.py`（结构化/平铺写出，默认不写 `# end`）
-  - `ner_list_tool.py`（稳健模型路径查找，优先根 `models/dbmdz/...`）
+  - `api_tool.py`（LLMService 与多家 Provider 适配，统一结构化响应解析）
+  - `config.py`（`GlobalConfig`，集中管理环境变量与运行参数）
+  - `read_tool.py`（结构化分段读取，支持大文档切块与元数据保留）
+  - `count_tool.py`（计数与长度控制工具，配合分段与速率限制使用）
+  - `csv_process_tool.py`（CSV 校验、术语表加载与匹配算法实现）
+  - `terminology_tool.py`（术语表导入/保存与结果落盘）
+  - `markitdown_tool.py`（非 Markdown 文档转换为 Markdown）
+  - `write_out_tool.py`（结构化/平铺写出，支持段落续写与标题栈维护）
+  - `translation_core.py`（翻译核心流程与重试/降级策略）
+  - `ner_list_tool.py`（稳健模型路径查找与 NER 识别）
+- 服务与诊断
+  - `services/diagnostics.py`（全局诊断管理与并发任务健康检查）
+- 测试与仿真
+  - `tests/`（pytest 测试套件，覆盖读取、术语匹配、翻译核心、写出与并发调度等）
+  - `test_prompts/`（提示词仿真脚本与样例，用于离线评估不同 Provider 行为）
 - 资源与数据
-  - `templates/`（`index.html`、`editor.html`）
-  - `static/`（`style.css`、`script.js`、`editor.js`）
-  - `uploads/`（上传与输出目录）
-  - `data/.env`（统一环境配置）
-  - `models/dbmdz/bert-large-cased-finetuned-conll03-english-for-ner/`（NER 模型）
+  - `templates/`（`index.html`、`editor.html`，WebUI 模板）
+  - `static/`（`style.css`、`script.js`、`editor.js`，前端静态资源）
+  - `uploads/`（用户上传与输出目录）
+  - `input_files/`、`output_files/`（CLI 模式下的输入输出目录）
+  - `data/.env.example`（环境配置示例文件）
+  - `models/`（NER 模型与其他本地模型资源，默认空目录，占位由 `.gitkeep` 维护）

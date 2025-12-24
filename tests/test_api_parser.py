@@ -30,10 +30,11 @@ def test_parse_partial_json_in_text():
     }, ensure_ascii=False)
     text = "前缀\n" + json_block + "\n后缀"
     result = parse_translation_response(text)
-    assert result["translation"] == "中文"
-    assert result["notes"].startswith("-")
+    assert result.get("error") == "Invalid JSON format"
+    assert result.get("origin_text") == text
 
 def test_schema_shape():
     schema = translation_json_schema()
     props = schema.get("properties", {})
-    assert set(["translation", "notes", "new_terms"]).issubset(props.keys())
+    assert set(["translation", "new_terms"]).issubset(props.keys())
+    assert "notes" not in props

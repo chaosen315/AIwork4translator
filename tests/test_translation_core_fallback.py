@@ -39,6 +39,7 @@ async def test_fallback():
     mock_llm.call_ai_model_api.return_value = (error_response, 100)
     mock_llm.create_prompt.return_value = "prompt"
     mock_llm.repair_json.return_value = (error_response, 50)
+    mock_llm.rewrite_with_glossary.return_value = ({"translation": "rewritten", "new_terms": []}, 10)
 
     core = TranslationCore(mock_llm)
     

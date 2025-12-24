@@ -7,7 +7,13 @@ Precise AI translation method with noun comparison list.
 
 中文 | [English](./README_en.md)
 
-## 最近更新（2025/12/12）
+## 最近更新（2025/12/24）
+
+### 🔍 英文论文跨页断句检测
+新增智能跨页断句检测功能，特别针对英文论文格式优化：
+- **跨页断句判定**：使用强否决+计分机制，识别句末标点、缩写结尾等，有效提升英文论文段落连续性
+- **图片段落跳过**：合并逻辑可智能跳过图片段落，避免对非文本内容的误操作
+- **位置保持**：图片段落跳过后可保持原文档中的相对位置，确保文档结构完整性
 
 ### ⚡ 并发模式重大性能突破
 我们实现了全新的并发翻译架构，带来显著的性能提升：
@@ -309,6 +315,7 @@ WebUI 使用 `FastAPI` 框架开发，主要文件位于根目录：
 ### 本地模型支持
 
 已支持Ollama本地部署模型的接入。通过修改`\data\.env`中的以下配置来调用本地模型：
+
 - `OLLAMA_BASE_URL`: Ollama服务的URL
 - `OLLAMA_MODEL`: 要使用的模型名称
 
@@ -333,6 +340,7 @@ python -m pytest
 ```
 
 ### 环境与默认配置
+
 - `.env` 位于根 `data/.env`；默认 LLM 配置：
   - `KIMI_BASE_URL=https://api.moonshot.cn/v1`
   - `KIMI_MODEL=kimi-k2-turbo-preview`
@@ -340,16 +348,22 @@ python -m pytest
   - 请务必安全保存 API KEY，不要提交到仓库。
 
 ### 迁移说明（2025/11/29）
+
 - 已合并 `src/` 与 `webui_project/` 到根结构；删除旧目录以减少路径混淆。
 - 统一模块到根 `modules/`，移除 RAG 缓存；WebUI 与 CLI 对齐返回值与写出策略（平铺默认不写 `# end`）。
 - 脚本入口更新为根：`program-translator-cli = "main:main"`、`program-translator-webui = "app:main"`。
 
 ## 开发计划
 
-- 1.2.0 版本：基础功能完成，包括 CLI、WebUI、模型支持等。
-- 未来版本：
-  - 计划通过MinerU增强对Markdown文件的解析性能。
-  - 计划实现传统CAP软件的交互模式，例如表格形式的翻译界面，原文与译文逐句对应，用户可以方便地进行编辑和修改。
+- **MinerU集成**：通过MinerU增强对Markdown文件的解析性能
+- **CAP交互模式**：实现传统CAP软件的交互模式，例如表格形式的翻译界面，原文与译文逐句对应
+
+### 已完成（2025/12/24）
+
+- ✅ 英文论文跨页断句检测与图片段落跳过
+- ✅ 并发架构优化与队列工作池模式
+- ✅ API内容自动修复与双层降级策略
+- ✅ CLI偏好记忆与术语动态管理
 
 ## 联系方式
 
