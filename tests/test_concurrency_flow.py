@@ -92,20 +92,26 @@ async def test_run_translation_loop_flow():
         {
             "translation": "Translated Content", 
             "notes": "Some notes", 
-            "newterminology": [{"term": "foo", "translation": "bar", "reason": "test"}]
+            "new_terms": [{"term": "foo", "translation": "bar", "reason": "test"}]
         }, 
         100 # tokens
     )
-    mock_llm.repair_json.return_value = {
-        "translation": "Repaired Content", 
-        "notes": "Repaired notes", 
-        "newterminology": []
-    }
-    mock_llm.rewrite_with_glossary.return_value = {
-        "translation": "Rewritten Content", 
-        "notes": "Rewritten notes", 
-        "newterminology": []
-    }
+    mock_llm.repair_json.return_value = (
+        {
+            "translation": "Repaired Content", 
+            "notes": "Repaired notes", 
+            "new_terms": []
+        },
+        50
+    )
+    mock_llm.rewrite_with_glossary.return_value = (
+        {
+            "translation": "Rewritten Content", 
+            "notes": "Rewritten notes", 
+            "new_terms": []
+        },
+        50
+    )
     
     core = TranslationCore(mock_llm)
     

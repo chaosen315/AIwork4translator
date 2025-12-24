@@ -24,7 +24,6 @@ class FakeValidProvider:
 def _sample_valid_json():
     return {
         "translation": "你好，世界",
-        "notes": ["术语1：注释", "术语2：注释"],
         "new_terms": [
             {"term": "Night City", "translation": "夜之城", "reason": "赛博朋克特定名词"}
         ],
@@ -52,13 +51,13 @@ def test_repair_json_triggered_when_invalid_json(monkeypatch):
             "translation": "修复后的译文",
             "notes": "- 术语1：注释\n- 术语2：注释",
             "new_terms": [],
-        }
+        }, 100
 
     monkeypatch.setattr(llm_service, "repair_json", spy_repair_json)
 
     response_obj, _ = llm_service.call_ai_model_api("dummy prompt")
     if response_obj.get("error") == "Invalid JSON format":
-        response_obj = llm_service.repair_json(response_obj.get("origin_text", ""))
+        response_obj, _ = llm_service.repair_json(response_obj.get("origin_text", ""))
 
     assert called["flag"] is True
     assert isinstance(called["received"], str) and "{" in called["received"]
@@ -76,11 +75,12 @@ def test_repair_json_effective_with_valid_fix(monkeypatch):
     llm_service.Linkedprovider = FakeValidProvider(fixed_json)
 
     # 输入任意原始非法 JSON 文本，实际由 FakeValidProvider 返回的内容决定解析结果
-    result = llm_service.repair_json("{translation: '坏的json'}")
+    result, _ = llm_service.repair_json("{translation: '坏的json'}")
 
     assert result.get("translation") == fixed_json["translation"]
     notes = result.get("notes", "")
-    assert "- 术语1：注释" in notes and "- 术语2：注释" in notes
+    # notes are now generated from new_terms
+    assert "夜之城" in notes and "Night City" in notes
     newterms = result.get("new_terms", [])
     assert len(newterms) == 1
     assert newterms[0]["term"] == "Night City"

@@ -267,7 +267,8 @@ class LLMService:
         return {"translation": content, "notes": "", "new_terms": []}, total_tokens
 
     def repair_json(self, origin_text: str) -> Tuple[Dict[str, Any], int]:
-        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:",r"{\"translation\": \"...\", \"new_terms\": [{\"term\": \"...\", \"translation\": \"...\", \"reason\": \"...\"}]}。"])
+        format = r"{'translation':'...','new_terms':[{'term': '...','translation':'...','reason':'...'}]}"
+        repair_prompt = "".join([f"请修复以下无效的JSON字符串，只返回修复后的JSON字符串，不要包含任何其他内容。\nInvalid json:{origin_text}\nJson format example:{format}。"])
         self._enforce_rate_limit()
         response_obj, total_tokens = self.Linkedprovider.generate_completion(repair_prompt, '你是一个专业的JSON修复助手，只能修复JSON字符串，不能返回其他内容。')
         parsed = parse_translation_response(response_obj)

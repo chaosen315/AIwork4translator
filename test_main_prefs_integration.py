@@ -7,15 +7,16 @@ import pytest
 
 class FakeLLMService:
     calls = []
-    def __init__(self, provider):
+    def __init__(self, provider="kimi"):
         self.provider = provider
+        self.providers = {"kimi": None}
         FakeLLMService.calls.append(provider)
     def create_prompt(self, paragraph, terms):
         return "prompt"
     def call_ai_model_api(self, prompt):
-        return "ok", 1
+        return {"translation": "ok", "new_terms": [], "notes": ""}, 1
     def test_api(self):
-        return "ok"
+        return {"success": True}
 
 
 def write_csv(path, rows):
@@ -49,7 +50,7 @@ def test_main_prefs_roundtrip(monkeypatch, tmp_path):
     monkeypatch.setattr("modules.write_out_tool.write_to_markdown", _write_to_markdown)
     monkeypatch.setattr("modules.csv_process_tool.find_matching_terms", lambda p, t: {})
 
-    inputs = iter(["kimi", str(md), "y", str(csvp)])
+    inputs = iter(["kimi", str(md), "y", str(csvp), "y", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
     import main as mainmod
     importlib.reload(mainmod)
@@ -62,7 +63,7 @@ def test_main_prefs_roundtrip(monkeypatch, tmp_path):
     assert prefs["last_input_md_file"] == str(md)
     assert prefs["last_csv_path"] == str(csvp)
 
-    inputs2 = iter(["", "", "y", ""])
+    inputs2 = iter(["", "", "y", "", "y", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs2))
     importlib.reload(mainmod)
     mainmod.main()
