@@ -94,7 +94,6 @@ project_root/
 │   ├── count_tool.py        # Paragraph counting (mirrors segmentation logic)
 │   ├── csv_process_tool.py  # Aho-Corasick term matching & CSV validation
 │   ├── markitdown_tool.py   # Non-Markdown → Markdown conversion
-│   ├── ner_list_tool.py     # Robust model path detection (prefers root models/)
 │   ├── terminology_tool.py  # Glossary management (save, merge, format)
 │   ├── translation_core.py  # Translation core engine (encapsulates unified translation workflow)
 │   └── write_out_tool.py    # Structured/flat writing (no "# end" by default)
@@ -112,7 +111,6 @@ project_root/
 ├── app.py                   # WebUI entry (provides main())
 ├── main.py                  # CLI entry (interactive, with preference persistence)
 ├── baseline.py              # Baseline CLI (unified API call, no RAG cache)
-├── ner_list_check.py        # NER-based glossary generator
 └── pyproject.toml           # Scripts: CLI/WebUI
 ```
 

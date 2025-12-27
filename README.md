@@ -101,7 +101,6 @@ project_root/
 │   ├── count_tool.py       # 统计工具（tokens计数、性能监控）
 │   ├── csv_process_tool.py # Aho-Corasick 匹配与 CSV 校验
 │   ├── markitdown_tool.py  # 非Markdown格式转换（PDF/Word/Excel等）
-│   ├── ner_list_tool.py    # 稳健模型查找，优先根 models/
 │   ├── read_tool.py        # 文件读取与结构化分段
 │   ├── terminology_tool.py # 术语表管理（保存、合并、格式化）
 │   ├── translation_core.py # 翻译核心引擎（封装统一翻译流程）
