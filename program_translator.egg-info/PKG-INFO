@@ -36,7 +36,6 @@ Requires-Dist: fsspec==2025.9.0
 Requires-Dist: h11==0.16.0
 Requires-Dist: httpcore==1.0.9
 Requires-Dist: httpx==0.28.1
-Requires-Dist: huggingface-hub==0.35.0
 Requires-Dist: humanfriendly==10.0
 Requires-Dist: idna==3.10
 Requires-Dist: iniconfig==2.1.0
@@ -69,17 +68,13 @@ Requires-Dist: python-dateutil==2.9.0.post0
 Requires-Dist: pytz==2025.2
 Requires-Dist: pyyaml==6.0.2
 Requires-Dist: regex==2025.9.1
-Requires-Dist: safetensors==0.6.2
 Requires-Dist: setuptools==65.5.0
 Requires-Dist: six==1.17.0
 Requires-Dist: sniffio==1.3.1
 Requires-Dist: soupsieve==2.8
 Requires-Dist: starlette==0.46.2
 Requires-Dist: sympy==1.14.0
-Requires-Dist: tokenizers==0.22.0
-Requires-Dist: torch==2.8.0
 Requires-Dist: tqdm==4.67.1
-Requires-Dist: transformers==4.56.1
 Requires-Dist: typing-extensions==4.15.0
 Requires-Dist: typing-inspection==0.4.1
 Requires-Dist: tzdata==2025.2
