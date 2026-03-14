@@ -109,13 +109,11 @@ class TranslationCore:
         repair_tokens = 0
         while attempts < max_api_retries:
             try:
-                # 异步调用 API（如果 LLMService 内部是同步的，使用 to_thread）
-                # 注意：llm_service.call_ai_model_api 内部已经包含了解析逻辑
-                # 但我们需要处理网络层面的重试，以及 JSON 修复层面的重试
+                # 异步调用 API（使用支持回退的异步方法）
+                # 注意：llm_service.call_ai_model_api_async 内部已经处理了同步/异步的兼容性
                 
-                # 这里假设 call_ai_model_api 是同步的，我们把它放到线程里跑
-                # 如果它本身支持异步，可以直接 await。目前看它是同步的。
-                response_data, tokens = await asyncio.to_thread(self.llm_service.call_ai_model_api, prompt)
+                # 直接使用 await 调用
+                response_data, tokens = await self.llm_service.call_ai_model_api_async(prompt)
                 last_response_data = response_data
                 # 检查是否需要 JSON 修复
                 # call_ai_model_api 已经在 structured=True 时尝试了解析，如果失败会返回 error 字段
@@ -128,8 +126,8 @@ class TranslationCore:
                     repaired = False
                     while repair_attempts < max_repair:
                         try:
-                            # 修复也是 IO 操作，放线程里
-                            response_data, add_tokens = await asyncio.to_thread(self.llm_service.repair_json, origin_text)
+                            # 修复调用异步接口
+                            response_data, add_tokens = await self.llm_service.repair_json_async(origin_text)
                             repair_tokens += add_tokens
                             if "error" not in response_data:
                                 repaired = True
@@ -164,12 +162,11 @@ class TranslationCore:
                 
                 # 如果有冲突，进行复写
                 if corrections:
-                    if hasattr(self.llm_service, 'rewrite_with_glossary'):
+                    if hasattr(self.llm_service, 'rewrite_with_glossary_async'):
                         translation = response_data.get("translation", "")
                         notes = response_data.get("notes", "")
-                        # 复写
-                        rewrite_result, rewrite_tokens = await asyncio.to_thread(
-                            self.llm_service.rewrite_with_glossary, 
+                        # 复写（异步）
+                        rewrite_result, rewrite_tokens = await self.llm_service.rewrite_with_glossary_async(
                             translation, 
                             notes, 
                             corrections
@@ -185,7 +182,7 @@ class TranslationCore:
                             repaired = False
                             while repair_attempts < max_repair:
                                 try:
-                                    rewrite_result, add_tokens = await asyncio.to_thread(self.llm_service.repair_json, origin_text)
+                                    rewrite_result, add_tokens = await self.llm_service.repair_json_async(origin_text)
                                     tokens += add_tokens
                                     if "error" not in rewrite_result:
                                         repaired = True

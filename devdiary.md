@@ -215,3 +215,15 @@
   - `app.py`: 适配日志读取预览。
   - `main.py`: 适配日志写入流程。
   - `tests/`: 新增 `test_log_manager.py` 和 `test_finalize_flow.py` 验证新流程。
+
+### 2026/03/14 - Ctrl+C 中断修复：LLM Provider 全量异步迁移
+- **背景**：并发翻译过程中使用 Ctrl+C 终止任务时，部分 Provider 由于同步网络请求阻塞，导致中断响应不及时。
+- **核心变更**：
+  - 统一在 `LLMProvider` 增加 `generate_completion_async` 异步接口，供上层在 asyncio 场景下直接 `await`。
+  - OpenAI 兼容 Provider（Kimi / GPT / Deepseek / Silicon / Doubao）补齐 `AsyncOpenAI` 客户端与对应的异步调用实现，并保持与同步调用参数一致。
+  - Gemini Provider 使用 `google.genai.Client.aio.models.generate_content` 提供原生异步实现。
+- **效果**：
+  - 上层可通过取消 asyncio 任务更快打断正在进行的请求，Ctrl+C 响应更及时。
+  - 各 Provider 的返回值格式保持一致：`(content, total_tokens)`。
+- **文件修改**：
+  - `modules/api_tool.py`: 为各 Provider 增加异步 client 与异步生成方法。
