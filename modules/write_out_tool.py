@@ -2,16 +2,35 @@ from typing import Union, Tuple, Optional
 import re
 import json
 import os
+from .log_manager import TranslationLogManager
 
 def write_to_markdown_through_json(
     json_file_path: str,
-    output_md_path: str,
+    _output_md_path: str,
     p_id: int,
     content_info: dict,
-    tracker_state: dict,
+    _tracker_state: dict,
     mode: str = "structured"
 ) -> None:
-    # 1. Update JSON
+    """
+    Appends the translation result to the incremental log file.
+    Does NOT write to the Markdown file or the full JSON file to avoid I/O bottlenecks.
+
+    _output_md_path and _tracker_state are kept for backward compatibility and are ignored.
+    """
+    log_manager = TranslationLogManager(json_file_path)
+    log_manager.append_log(p_id, content_info)
+
+def finalize_translation_output(
+    json_file_path: str,
+    output_md_path: str,
+    mode: str = "structured"
+) -> None:
+    """
+    Merges the incremental logs into the blueprint JSON and generates the final Markdown file.
+    Should be called once at the end of the translation process.
+    """
+    # 1. Load Blueprint
     try:
         with open(json_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -19,67 +38,66 @@ def write_to_markdown_through_json(
         print(f"Error: JSON file not found at {json_file_path}")
         return
 
-    # Find and update
-    target_idx = -1
-    # Optimization: Check if index p_id-1 matches (assuming sorted 1-based IDs)
-    if p_id - 1 < len(data['text_info']) and data['text_info'][p_id - 1]['paragraph_number'] == p_id:
-        target_idx = p_id - 1
-        item = data['text_info'][target_idx]
-        item['translation'] = content_info.get('translation', '')
-        item['notes'] = content_info.get('notes', '')
-        item['new_terms'] = content_info.get('new_terms', [])
-        item['status'] = 'completed'
-    else:
-        for idx, item in enumerate(data['text_info']):
-            if item['paragraph_number'] == p_id:
-                target_idx = idx
-                item['translation'] = content_info.get('translation', '')
-                item['notes'] = content_info.get('notes', '')
-                item['new_terms'] = content_info.get('new_terms', [])
-                item['status'] = 'completed'
-                break
-            
-    if target_idx == -1:
-        print(f"Error: Paragraph {p_id} not found in JSON")
+    # 2. Replay Logs
+    log_manager = TranslationLogManager(json_file_path)
+    updates = log_manager.replay_logs()
+    
+    if not updates:
+        print("No translation logs found to merge.")
         return
-        
-    with open(json_file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        
-    # 2. Check and Write to MD
-    while True:
-        next_id = tracker_state['next_id']
-        
-        # Check if next_id exists
-        if next_id - 1 >= len(data['text_info']):
-            break
+
+    # 3. Update Blueprint in Memory
+    text_info = data.get('text_info', [])
+    # Create a map for faster lookup if needed, but iterating is fine for update
+    # Better: iterate over text_info and update if p_id in updates
+    
+    # We also need to respect the order for MD writing
+    # text_info is usually sorted by paragraph_number
+    
+    # Clear the file first to avoid appending to existing content?
+    # write_to_markdown uses 'a' (append). So we should clear it if we are regenerating.
+    with open(output_md_path, 'w', encoding='utf-8') as f:
+        f.write('') # Clear file
+
+    for item in text_info:
+        p_id = item.get('paragraph_number')
+        if p_id in updates:
+            update = updates[p_id]
+            # Update fields
+            item['translation'] = update.get('translation', '')
+            item['notes'] = update.get('notes', '')
+            item['new_terms'] = update.get('new_terms', [])
+            item['matched_terms'] = update.get('matched_terms', [])
+            item['status'] = 'completed'
             
-        candidate = data['text_info'][next_id - 1]
-        
-        # Double check ID match
-        if candidate['paragraph_number'] != next_id:
-             # Fallback search
-             candidate = next((x for x in data['text_info'] if x['paragraph_number'] == next_id), None)
-             if not candidate:
-                 break
-        
-        if candidate.get('status') == 'completed':
-            trans = candidate['translation']
-            notes = candidate['notes']
+        # Write to MD if completed
+        if item.get('status') == 'completed':
+            trans = item.get('translation', '')
+            notes = item.get('notes', '')
             response = trans
             if notes:
                 response = f"{trans}\n\n---\n\n{notes}\n\n---\n\n"
             
-            meta_data = candidate['meta_data']
+            meta_data = item.get('meta_data')
             if meta_data and meta_data.get('is_continuation'):
                 meta_data = None
-            
+                
             write_to_markdown(output_md_path, (response, meta_data), mode)
-            
-            tracker_state['next_id'] += 1
-            # print(f"[System] 已写入段落 {next_id}") # Optional logging
-        else:
-            break
+
+    # 4. Save Updated Blueprint
+    with open(json_file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        
+    # 5. Cleanup Log? 
+    # Spec says: "TranslationLogManager is removed after successful finalization (or kept...)"
+    # Let's keep it for safety or manual cleanup, or rename it.
+    # For now, leaving it is safer. User can delete.
+    if os.path.exists(log_manager.log_path):
+        try:
+            os.remove(log_manager.log_path)
+            print(f"[System] Removed temporary log file: {log_manager.log_path}")
+        except OSError as e:
+            print(f"[Warning] Could not remove log file: {e}")
 
 def write_to_markdown(
     output_file_path: str,

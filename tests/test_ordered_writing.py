@@ -4,7 +4,8 @@ import json
 import os
 import shutil
 from unittest.mock import patch, MagicMock
-from modules.write_out_tool import write_to_markdown_through_json
+from modules.write_out_tool import write_to_markdown_through_json, finalize_translation_output
+from modules.log_manager import TranslationLogManager
 
 class TestOrderedWriting(unittest.TestCase):
     def setUp(self):
@@ -56,46 +57,48 @@ class TestOrderedWriting(unittest.TestCase):
     def test_out_of_order_writing(self, mock_write):
         tracker = {'next_id': 1}
         
-        # 1. Complete Paragraph 2 (Out of order)
         info_2 = {'translation': 't2', 'notes': 'n2', 'new_terms': []}
         write_to_markdown_through_json(self.json_path, self.md_path, 2, info_2, tracker)
         
-        # Verify JSON updated
         with open(self.json_path, 'r', encoding='utf-8') as f:
             d = json.load(f)
-            self.assertEqual(d['text_info'][1]['translation'], 't2')
-            self.assertEqual(d['text_info'][1]['status'], 'completed')
-            
-        # Verify NO write to MD (waiting for 1)
+            self.assertEqual(d['text_info'][1]['translation'], '')
+            self.assertEqual(d['text_info'][1]['status'], 'pending')
+
         mock_write.assert_not_called()
-        self.assertEqual(tracker['next_id'], 1)
+
+        log_manager = TranslationLogManager(self.json_path)
+        updates = log_manager.replay_logs()
+        self.assertEqual(updates[2]['translation'], 't2')
         
-        # 2. Complete Paragraph 1
         info_1 = {'translation': 't1', 'notes': '', 'new_terms': []}
         write_to_markdown_through_json(self.json_path, self.md_path, 1, info_1, tracker)
         
-        # Verify writes
-        # Should write p1 THEN p2
-        self.assertEqual(mock_write.call_count, 2)
-        
-        # Check calls args
-        # Call 1: p1
+        info_3 = {'translation': 't3', 'notes': '', 'new_terms': []}
+        write_to_markdown_through_json(self.json_path, self.md_path, 3, info_3, tracker)
+
+        mock_write.assert_not_called()
+
+        finalize_translation_output(self.json_path, self.md_path, mode='flat')
+
+        self.assertEqual(mock_write.call_count, 3)
         args1, _ = mock_write.call_args_list[0]
-        self.assertEqual(args1[1][0], 't1') # content tuple (text, meta)
-        
-        # Call 2: p2
+        self.assertEqual(args1[1][0], 't1')
+
         args2, _ = mock_write.call_args_list[1]
         self.assertIn('t2', args2[1][0])
         self.assertIn('n2', args2[1][0])
-        
-        self.assertEqual(tracker['next_id'], 3)
-        
-        # 3. Complete Paragraph 3
-        info_3 = {'translation': 't3', 'notes': '', 'new_terms': []}
-        write_to_markdown_through_json(self.json_path, self.md_path, 3, info_3, tracker)
-        
-        self.assertEqual(mock_write.call_count, 3)
-        self.assertEqual(tracker['next_id'], 4)
+
+        args3, _ = mock_write.call_args_list[2]
+        self.assertEqual(args3[1][0], 't3')
+
+        with open(self.json_path, 'r', encoding='utf-8') as f:
+            d2 = json.load(f)
+            self.assertEqual(d2['text_info'][0]['translation'], 't1')
+            self.assertEqual(d2['text_info'][1]['translation'], 't2')
+            self.assertEqual(d2['text_info'][2]['translation'], 't3')
+
+        self.assertFalse(os.path.exists(log_manager.log_path))
 
 if __name__ == '__main__':
     unittest.main()

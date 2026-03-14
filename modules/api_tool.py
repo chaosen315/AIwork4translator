@@ -249,12 +249,19 @@ class LLMService:
         self.provider_name = value.lower()
         self.Linkedprovider = self.providers.get(self.provider_name)() # type: ignore
 
-    def create_prompt(self, paragraph: str, terms_dict: Dict[str, str]) -> str:
+    def create_prompt(self, paragraph: str, terms_dict: Dict[str, Any]) -> str:
         base_prompt = (
             f"\n原文段落：\n{paragraph}{os.getenv('BASE_PROMPT')}"
         )
         if terms_dict:
-            terms_info = '\n'.join([f"{eng} -> {chi}" for eng, chi in terms_dict.items()])
+            terms_list = []
+            for eng, val in terms_dict.items():
+                if isinstance(val, dict):
+                    trans = val.get('translation', '')
+                else:
+                    trans = str(val)
+                terms_list.append(f"{eng} -> {trans}")
+            terms_info = '；'.join(terms_list)
             return f"术语表：{terms_info}\n{base_prompt}"
         return base_prompt
 

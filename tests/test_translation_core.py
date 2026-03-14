@@ -25,6 +25,7 @@ async def test_execute_translation_step_success(mock_llm_service):
     assert result.success
     assert result.content == "T"
     assert result.tokens == 100
+    assert result.matched_terms_delta == []  # Check default empty list
     mock_llm_service.call_ai_model_api.assert_called_once()
 
 @pytest.mark.asyncio
@@ -65,7 +66,8 @@ async def test_rewrite_with_glossary(mock_llm_service):
     )
     
     # terms has 'foo' -> 'baz'
-    terms = {"foo": "baz"}
+    # Use full dict structure for terms as per new changes
+    terms = {"foo": {"term": "foo", "translation": "baz", "reason": "glossary"}}
     
     mock_llm_service.rewrite_with_glossary.return_value = (
         {
@@ -84,4 +86,27 @@ async def test_rewrite_with_glossary(mock_llm_service):
     mock_llm_service.rewrite_with_glossary.assert_called_once()
     args = mock_llm_service.rewrite_with_glossary.call_args
     # args[0] is (translation, notes, corrections)
+    # corrections should be simple dict {term: translation}
     assert args[0][2] == {"foo": "baz"}
+
+@pytest.mark.asyncio
+async def test_matched_terms_delta(mock_llm_service):
+    """Test that matched_terms_delta is correctly populated from terms"""
+    core = TranslationCore(mock_llm_service)
+    segment = {"content": "The priority is high.", "meta_data": {}}
+    
+    # Prepare terms dict with full info
+    terms = {
+        "priority": {"term": "priority", "translation": "优先级", "reason": "context"}
+    }
+    new_terms = {}
+    
+    result = await core.execute_translation_step(segment, terms, new_terms)
+    
+    assert result.success
+    # Check if matched_terms_delta contains the expected term info
+    assert len(result.matched_terms_delta) == 1
+    matched = result.matched_terms_delta[0]
+    assert matched["term"] == "priority"
+    assert matched["translation"] == "优先级"
+    assert matched["reason"] == "context"

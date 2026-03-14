@@ -78,7 +78,9 @@ def validate_csv_file(path):
         return False, original_path
 
 
-def load_terms_dict(csv_file_path: str) -> Dict[str, str]:
+from typing import Dict, Any
+
+def load_terms_dict(csv_file_path: str) -> Dict[str, Any]:
     terms_dict = {}
     with open(csv_file_path, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
@@ -88,7 +90,13 @@ def load_terms_dict(csv_file_path: str) -> Dict[str, str]:
                 eng_term = row[0].strip()
                 chi_term = row[1].strip()
                 if eng_term:
-                    terms_dict[eng_term] = chi_term
+
+                    terms_dict[eng_term] = {
+                        "term": eng_term,
+                        "translation": chi_term,
+                        "reason": row[2].strip() if len(row) > 2 else ""
+                    }
+
     return terms_dict
 
 def preprocess_text(text: str) -> str:

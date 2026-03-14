@@ -137,7 +137,7 @@ def read_structured_paragraphs(
                         )
                         continuation_header = header_stack[-1] if header_stack else "Document Start"
                         current_chunk = [
-                            f"<!-- Continued from {continuation_header} -->",
+                            f"\n",
                             line[split_pos:]
                         ]
                     else:
@@ -389,6 +389,7 @@ def read_and_process_structured_paragraphs_to_json(
             'translation': '',
             'notes': '',
             'new_terms': [],
+            'matched_terms': [],
             'status': 'pending'
         })
 
