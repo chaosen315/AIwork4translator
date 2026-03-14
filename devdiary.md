@@ -227,3 +227,19 @@
   - 各 Provider 的返回值格式保持一致：`(content, total_tokens)`。
 - **文件修改**：
   - `modules/api_tool.py`: 为各 Provider 增加异步 client 与异步生成方法。
+
+### 2026/03/14 - 多格式导出与结构预览：基于 `_intermediate.json`
+- **背景**：翻译完成后需要直接生成可分发的文档（Word/PDF/EPUB/Excel），并能快速检查导出结果的结构是否正确（标题层级/目录/正文）。
+- **核心变更**：
+  - 以 `_intermediate.json` 为单一数据源实现导出，避免对 Markdown 进行二次解析导致结构丢失。
+  - 导出模块统一按 Markdown 标题语法（`#`-`######`）识别并重建结构：
+    - DOCX：标题写入为 Heading，正文按段落写入；Notes 以灰色斜体追加。
+    - EPUB：按一级标题拆分章节并生成目录（TOC），正文段落换行保留为 `<br/>`。
+    - PDF：改用 ReportLab 直出（避免 CJK 字体在 xhtml2pdf 中不稳定），嵌入系统中文字体后中文可正常显示与文本抽取。
+  - 新增结构预览脚本：输出 DOCX 标题、EPUB 目录，以及 PDF 第 1 页文本抽取，便于快速人工验收。
+- **文件修改/新增**：
+  - `modules/export_tool.py`
+  - `scripts/preview_export_outputs.py`
+- **验证与结果**：
+  - 测试：`uv run pytest -q tests/test_export.py` 通过。
+  - 实测：对 `input_files/《赤红传说》112-127_intermediate.json` 导出 `docx/pdf/epub`，预览脚本可正确展示 DOCX 标题、EPUB 目录，且 PDF 中文文本抽取正常。

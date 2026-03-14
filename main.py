@@ -15,6 +15,7 @@ from modules.write_out_tool import write_to_markdown, write_to_markdown_through_
 from modules.markitdown_tool import markitdown_tool
 from modules.count_tool import count_md_words, count_structured_paragraphs
 from modules.translation_core import TranslationCore, TranslationResult, TerminologyPolicy
+from modules.export_tool import export_json_to_xlsx, export_json_to_docx, export_json_to_pdf, export_json_to_epub
 from services.diagnostics import global_diagnostics
 
 @dataclass
@@ -368,6 +369,9 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
     # 如果是 generator (read_structured_paragraphs 返回 generator)，需要小心
     # config.paragraphs 在非并发模式下是 generator
     
+    # Collection for export
+    completed_paragraphs = []
+    
     for segment in iterator:
         current_paragraph += 1
         print(f"开始翻译段落【{current_paragraph}】/【{config.total_paragraphs}】")
@@ -422,6 +426,18 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
                     response_text += f"\n\n---\n\n{result.notes}\n"
                 print(response_text)
                 
+                # 收集用于 JSON 导出的数据
+                completed_paragraphs.append({
+                    'paragraph_number': current_paragraph,
+                    'meta_data': meta_data,
+                    'content': paragraph_text,
+                    'translation': result.content,
+                    'notes': result.notes,
+                    'new_terms': result.new_terms_delta,
+                    'matched_terms': result.matched_terms_delta,
+                    'status': 'completed'
+                })
+                
                 # 写出
                 mode = 'structured' if config.preserve_structure else 'flat'
                 write_to_markdown(config.output_md_file, (response_text, meta_data), mode) # type: ignore
@@ -463,6 +479,17 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
                     print("正在重试当前段落...")
                     time.sleep(1) # Backoff
 
+    # Save JSON for Sync Mode
+    if not config.json_path:
+        config.json_path = os.path.join(config.input_dir, f"{config.base_name}_intermediate.json")
+    
+    try:
+        with open(config.json_path, 'w', encoding='utf-8') as f:
+            json.dump({'text_info': completed_paragraphs}, f, ensure_ascii=False, indent=2)
+        print(f"中间 JSON 文件已保存至: {config.json_path}")
+    except Exception as e:
+        print(f"保存中间 JSON 失败: {e}")
+
     return total_token
 
 def save_untranslated(input_md_file, input_dir, base_name, last_text=None):
@@ -481,6 +508,76 @@ def save_untranslated(input_md_file, input_dir, base_name, last_text=None):
             print(f"未翻译部分已保存至：{untranslated_path}")
     except Exception as e:
         print(f"保存未翻译部分失败: {e}")
+
+def handle_export(config: UserConfig):
+    if not config.json_path or not os.path.exists(config.json_path):
+        print("未找到中间 JSON 文件，无法进行格式转换导出。")
+        return
+
+    print("\n--------------------------------------------------")
+    print("翻译已完成。是否需要将结果导出为其他格式？")
+    print("支持格式：DOCX, PDF, EPUB, XLSX")
+    print("--------------------------------------------------")
+    
+    while True:
+        choice = input("是否导出？(y/n): ").strip().lower()
+        if choice == 'n':
+            return
+        elif choice == 'y':
+            break
+        else:
+            print("请输入 y 或 n")
+    
+    print("\n请选择导出格式（输入数字，多选可用逗号分隔，如 1,4）：")
+    print("1. DOCX (Word 文档)")
+    print("2. PDF (便携式文档)")
+    print("3. EPUB (电子书)")
+    print("4. XLSX (Excel 表格)")
+    print("5. 全部导出")
+    
+    choices = input("请输入选项: ").strip()
+    selected = set()
+    
+    if '5' in choices or 'all' in choices.lower():
+        selected = {1, 2, 3, 4}
+    else:
+        parts = choices.replace('，', ',').split(',')
+        for p in parts:
+            p = p.strip()
+            if p in ('1', '2', '3', '4'):
+                selected.add(int(p))
+    
+    if not selected:
+        print("未选择有效格式，跳过导出。")
+        return
+
+    base_path = os.path.splitext(config.output_md_file)[0]
+    
+    if 1 in selected:
+        print("正在导出 DOCX ...")
+        out_path = f"{base_path}.docx"
+        if export_json_to_docx(config.json_path, out_path):
+            print(f"DOCX 导出成功: {out_path}")
+            
+    if 2 in selected:
+        print("正在导出 PDF ...")
+        out_path = f"{base_path}.pdf"
+        if export_json_to_pdf(config.json_path, out_path):
+            print(f"PDF 导出成功: {out_path}")
+
+    if 3 in selected:
+        print("正在导出 EPUB ...")
+        out_path = f"{base_path}.epub"
+        if export_json_to_epub(config.json_path, out_path):
+            print(f"EPUB 导出成功: {out_path}")
+
+    if 4 in selected:
+        print("正在导出 XLSX ...")
+        out_path = f"{base_path}.xlsx"
+        if export_json_to_xlsx(config.json_path, out_path):
+            print(f"XLSX 导出成功: {out_path}")
+            
+    print("导出流程结束。")
 
 def finalize_process(config: UserConfig, total_token, start_time, glossary_df, aggregated_new_terms):
     end_time = perf_counter()
@@ -557,6 +654,8 @@ def main():
             )
             
         finalize_process(config, total_token, start_time, glossary_df, aggregated_new_terms)
+        
+        handle_export(config)
         
     except KeyboardInterrupt:
         print("\n任务已中断，开始保存累积的术语表……")
