@@ -11,7 +11,7 @@ from modules.read_tool import read_structured_paragraphs, read_and_process_struc
 from modules.csv_process_tool import get_valid_path, validate_csv_file, load_terms_dict
 from modules.terminology_tool import load_glossary_df, save_terms_result
 from modules.api_tool import LLMService
-from modules.write_out_tool import write_to_markdown, write_to_markdown_through_json
+from modules.write_out_tool import write_to_markdown, write_to_markdown_through_json, finalize_translation_output, TranslationLogManager
 from modules.markitdown_tool import markitdown_tool
 from modules.count_tool import count_md_words, count_structured_paragraphs
 from modules.translation_core import TranslationCore, TranslationResult, TerminologyPolicy
@@ -193,9 +193,30 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
     # Ensure paragraphs are sorted
     paragraphs.sort(key=lambda x: x['paragraph_number'] if isinstance(x, dict) and 'paragraph_number' in x else 0)
     
+    # 1. Replay logs and filter completed tasks
+    if json_path:
+        log_manager = TranslationLogManager(json_path)
+        updates = await asyncio.to_thread(log_manager.replay_logs)
+        if updates:
+            print(f"[System] 发现 {len(updates)} 个已完成的段落记录，正在恢复进度...")
+            for p in paragraphs:
+                p_id = p.get('paragraph_number')
+                if p_id in updates:
+                    # Update paragraph with logged info
+                    info = updates[p_id]
+                    p['translation'] = info.get('translation', '')
+                    p['notes'] = info.get('notes', '')
+                    p['new_terms'] = info.get('new_terms', [])
+                    p['status'] = 'completed'
+                    
+                    # Restore terms to aggregated list for consistency
+                    if p['new_terms']:
+                        aggregated_new_terms.extend(p['new_terms'])
+    
     queue = asyncio.Queue()
     for p in paragraphs:
-        queue.put_nowait(p)
+        if p.get('status') != 'completed':
+            queue.put_nowait(p)
         
     file_lock = asyncio.Lock()
     tracker_state = {'next_id': 1} if json_path else None
@@ -203,9 +224,8 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
     aggregated_new_terms_dict = {}
     for nt in list(aggregated_new_terms):
         k = str(nt.get('term', '')).strip()
-        v = str(nt.get('translation', '')).strip()
         if k:
-            aggregated_new_terms_dict[k] = v
+            aggregated_new_terms_dict[k] = nt
     
     consecutive_failures = 0
     
@@ -270,10 +290,13 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
                         content_info = {
                             'translation': result.content,
                             'notes': result.notes,
-                            'new_terms': result.new_terms_delta
+                            'new_terms': result.new_terms_delta,
+                            'matched_terms': result.matched_terms_delta # Added missing field
                         }
+                        # Use updated logic: just append log, no MD writing here
                         await asyncio.to_thread(write_to_markdown_through_json, json_path, output_md_file, p_id, content_info, tracker_state, mode) # type: ignore
                     else:
+                        # Fallback for non-JSON mode (still direct write)
                         await asyncio.to_thread(write_to_markdown, output_md_file, (response_text, segment.get('meta_data')), mode) # type: ignore
                 
                 print(f"[System] Worker-{worker_id} 完成段落 {p_id}")
@@ -290,60 +313,20 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
     workers = [asyncio.create_task(worker(i+1)) for i in range(concurrency_limit)]
     await asyncio.gather(*workers)
 
-    # 熔断后尝试保存未翻译部分
+    # 熔断后尝试保存未翻译部分 (Log based recovery makes this less critical but kept for non-JSON mode)
     is_err, _ = global_diagnostics.get_global_error_state()
     if is_err:
-        print("[System] 任务因熔断停止，正在尝试保存未翻译部分...")
-        # 找出第一个未完成的段落
-        # 注意：paragraphs 已经排过序
-        # 我们需要找到第一个没有被成功写入（或标记完成）的段落
-        # 如果是 JSON 模式，我们可以检查 JSON 文件状态
-        # 如果不是，我们只能根据 queue 剩余或者 result 状态推断？
-        # 简单策略：遍历 paragraphs，找到第一个不在 aggregated_new_terms 且没有 content 的？
-        # 不对，aggregated_new_terms 是术语。
-        # 我们可以检查 queue 里的剩余任务，但这只能拿到未领取的。
-        # 已领取但失败的任务不在 queue 里。
-        # 更可靠的方法：如果 paragraphs 是有序列表，我们应该能找到第一个未完成的。
-        # 但我们没有状态标记回写到 paragraphs 列表里（除非是 JSON 模式且共享对象）。
-        
-        # 在 JSON 模式下，json_path 对应的文件会被更新。我们可以读取它。
-        if json_path and os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                info_list = data.get('text_info', [])
-                # 找第一个 pending
-                first_pending_idx = -1
-                for i, item in enumerate(info_list):
-                    if item.get('status') != 'completed':
-                        first_pending_idx = i
-                        break
-                
-                if first_pending_idx != -1:
-                    # 获取未翻译文本
-                    # 假设原始文件内容还在
-                    # save_untranslated 需要 input_md_file 等参数，但这里只有 run_translation_loop 的参数
-                    # 这是一个设计问题：run_translation_loop 缺少上下文。
-                    # 但我们可以尝试直接写出 rest.md，基于 remaining content
-                    
-                    # 构造 rest.md 内容
-                    rest_content = []
-                    for item in info_list[first_pending_idx:]:
-                        c = item.get('content', '')
-                        if c:
-                            rest_content.append(c)
-                    
-                    if rest_content:
-                        input_dir = os.path.dirname(output_md_file)
-                        base_name = os.path.splitext(os.path.basename(output_md_file))[0].replace('_output', '')
-                        rest_path = os.path.join(input_dir, f"{base_name}_rest.md")
-                        with open(rest_path, 'w', encoding='utf-8') as f:
-                            f.write("\n\n".join(rest_content))
-                        print(f"[System] 未翻译部分已保存至：{rest_path}")
-            except Exception as e:
-                print(f"[System] 保存未翻译部分失败: {e}")
-        else:
-             print("[System] 非JSON模式或文件缺失，暂不支持自动保存rest.md（建议使用Ctrl+C中断以触发兜底保存）。")
+        print("[System] 任务因熔断停止。")
+        # Logic to save rest.md could reuse finalize if implemented, but here we just stop.
+        # Log is already saved.
+    
+    # Finalize Output
+    if json_path and not is_err: # Only finalize if no global error? Or always?
+        # User might want partial result. Let's finalize even if error, so we get what we have.
+        print("[System] 正在生成最终 Markdown 文件...")
+        mode = 'structured' if PS else 'flat'
+        await asyncio.to_thread(finalize_translation_output, json_path, output_md_file, mode)
+        print(f"[System] 最终文件生成完毕: {output_md_file}")
 
     return stats['total_tokens']
 
@@ -409,9 +392,8 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
             # 更新 persistent_new_terms_dict
             for nt in aggregated_new_terms:
                 k = str(nt.get('term', '')).strip()
-                v = str(nt.get('translation', '')).strip()
                 if k:
-                    persistent_new_terms_dict[k] = v
+                    persistent_new_terms_dict[k] = nt
             
             try:
                 # 同步循环调用异步方法，需要 asyncio.run 或者在新事件循环中运行

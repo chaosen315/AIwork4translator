@@ -84,3 +84,23 @@ def test_aho_proper_noun_duplicate_keys_collapsed():
     res = find_matching_terms("We met Hopkins in the lobby.", terms)
     assert len(res) == 1
     assert list(res.values())[0] == "霍普金斯"
+
+def test_aho_full_info_dict_input():
+    """测试当输入terms字典值为对象时，匹配逻辑是否正常工作"""
+    terms = {
+        "priority": {"term": "priority", "translation": "优先级", "reason": "test"},
+        "board game": {"term": "board game", "translation": "桌游", "reason": "test2"}
+    }
+    
+    # 测试匹配
+    res = find_matching_terms("The priority is high.", terms)
+    
+    # 期望返回完整的对象
+    expected_val = terms["priority"]
+    assert "priority" in res
+    assert res["priority"] == expected_val
+    assert res["priority"]["translation"] == "优先级"
+    
+    # 测试未匹配
+    res_none = find_matching_terms("No match here.", terms)
+    assert res_none == {}

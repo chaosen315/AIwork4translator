@@ -7,11 +7,11 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
 from pathlib import Path
 from modules.config import global_config, setup_runtime_config
-from modules.read_tool import read_structured_paragraphs
+from modules.read_tool import read_structured_paragraphs, read_and_process_structured_paragraphs_to_json
 from modules.count_tool import count_structured_paragraphs
 from modules.csv_process_tool import validate_csv_file, load_terms_dict, find_matching_terms
 from modules.api_tool import LLMService
-from modules.write_out_tool import write_to_markdown
+from modules.write_out_tool import write_to_markdown, finalize_translation_output, TranslationLogManager
 from modules.markitdown_tool import markitdown_tool
 from modules.translation_core import TranslationCore, TranslationResult, TerminologyPolicy
 from services.diagnostics import global_diagnostics
@@ -187,36 +187,63 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
     MAX_CONSECUTIVE_FAILURES = 3
     last_error = None
     log_action("段落读取开始", f"文件: {input_md_file}, 分块大小: {CHUNK_SIZE}, 保留结构: {PS}")
-    total_paragraphs = count_structured_paragraphs(input_md_file, max_chunk_size=CHUNK_SIZE, preserve_structure=PS)
-    paragraphs = read_structured_paragraphs(input_md_file, max_chunk_size=CHUNK_SIZE, preserve_structure=PS)
+    # Use JSON blueprint approach for consistency and performance
+    json_path = await asyncio.to_thread(
+        read_and_process_structured_paragraphs_to_json,
+        input_md_file,
+        max_chunk_size=CHUNK_SIZE,
+        min_chunk_size=int(CHUNK_SIZE*0.5),
+        preserve_structure=PS
+    )
+    log_action("中间JSON生成完成", f"路径: {json_path}")
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        json_data = json.load(f)
+    paragraphs = json_data['text_info']
+    total_paragraphs = len(paragraphs)
+    
     log_action("段落读取完成", f"段落数量: {total_paragraphs}")
     task_id = os.path.basename(output_md_file)
     if task_id in translation_tasks:
         translation_tasks[task_id]["total_paragraphs"] = total_paragraphs
+        translation_tasks[task_id]["json_path"] = json_path
+        translation_tasks[task_id]["blueprint_data"] = json_data # Cache blueprint for preview
+        
+    log_manager = TranslationLogManager(json_path)
+    
     log_action("段落处理开始", f"总段落数: {total_paragraphs}")
     
     for idx, segment in enumerate(paragraphs):
         log_action(f"处理段落[{idx+1}/{total_paragraphs}]", "开始解析segment格式")
         try:
-            if isinstance(segment, tuple):
+            # Segment from JSON is already a dict with content and meta_data
+            if isinstance(segment, dict):
+                paragraph = segment.get('content', '')
+                meta_data = segment.get('meta_data')
+                p_id = segment.get('paragraph_number', idx + 1)
+                log_action(f"段落[{idx+1}]处理模式", "JSON蓝图模式")
+            elif isinstance(segment, tuple): # Legacy fallback
                 paragraph = segment[0]
                 meta_data = segment[1] if len(segment) > 1 else None
+                p_id = idx + 1
                 log_action(f"段落[{idx+1}]处理模式", "结构化模式 (Structure)")
-                log_action(f"段落[{idx+1}]元数据", str(meta_data)[:100] + ("..." if len(str(meta_data)) > 100 else ""))
             else:
                 paragraph = segment
                 meta_data = None
+                p_id = idx + 1
                 log_action(f"段落[{idx+1}]处理模式", "扁平模式 (flat)")
         except Exception as e:
             log_error(f"段落[{idx+1}]解析错误", str(e))
             paragraph = segment
             meta_data = None
+            p_id = idx + 1
             log_action(f"段落[{idx+1}]降级处理", "使用扁平模式 (flat)")
             
         # 构造 Core 所需的 segment dict
         segment_data = {
             "content": paragraph,
-            "meta_data": meta_data
+            "meta_data": meta_data,
+            "paragraph_number": p_id
         }
 
         try:
@@ -250,18 +277,20 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
             log_action(f"段落[{idx+1}]调用成功", f"响应长度: {len(response)}")
             consecutive_failures = 0
             
-            log_action(f"段落[{idx+1}]结果写入", f"模式: {'structured' if preservestructure else 'flat'}")
-            if preservestructure:
-                write_to_markdown(
-                    output_md_file,
-                    (response, meta_data),
-                    mode='structured'
-                )
-            else:
-                write_to_markdown(output_md_file,
-                                (response, meta_data),
-                                mode='flat')
-            log_action(f"段落[{idx+1}]结果写入完成", output_md_file)
+            log_action(f"段落[{idx+1}]结果写入日志", f"模式: {'structured' if preservestructure else 'flat'}")
+            
+            # Construct content info for log
+            content_info = {
+                'translation': result.content,
+                'notes': result.notes,
+                'new_terms': result.new_terms_delta,
+                'matched_terms': result.matched_terms_delta
+            }
+            
+            # Append to log
+            await asyncio.to_thread(log_manager.append_log, p_id, content_info)
+            
+            log_action(f"段落[{idx+1}]日志写入完成")
             if task_id in translation_tasks:
                 translation_tasks[task_id]["current_paragraph"] = idx + 1
         except Exception as e:
@@ -285,9 +314,19 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
                     "error": last_error,
                     "test_results": test_results
                 }
+    
+    # Finalize Output
+    if task_id in translation_tasks:
+        translation_tasks[task_id]["status"] = "finalizing"
+    
+    log_action("文件处理完成", "正在生成最终文件...")
+    mode = 'structured' if preservestructure else 'flat'
+    await asyncio.to_thread(finalize_translation_output, json_path, output_md_file, mode)
+    
     if task_id in translation_tasks:
         translation_tasks[task_id]["status"] = "completed"
-    log_action("文件处理完成", f"成功生成输出文件: {output_md_file}")
+        
+    log_action("文件生成完毕", f"成功生成输出文件: {output_md_file}")
     return {
         "status": "success",
         "output_file": output_md_file
@@ -577,13 +616,25 @@ async def translation_progress(task_id: str = None, output_file: str = None):
                 "status": "error",
                 "message": "未找到翻译任务"
             })
+            
+        # New Logic: Generate preview from blueprint + logs
         content = ""
-        if output_file and os.path.exists(output_file):
+        json_path = task_info.get("json_path")
+        blueprint_data = task_info.get("blueprint_data")
+        
+        if json_path and blueprint_data:
+            # Use Log Manager to get preview
+            log_manager = TranslationLogManager(json_path)
+            # Run in thread to avoid blocking event loop with file I/O (replay logs)
+            content = await asyncio.to_thread(log_manager.get_preview_content, blueprint_data)
+        elif output_file and os.path.exists(output_file):
+            # Fallback for legacy or finalized tasks
             try:
                 with open(output_file, 'r', encoding='utf-8') as f:
                     content = f.read()
             except Exception as e:
                 log_error("读取文件内容失败", str(e))
+                
         progress = 0
         if task_info["total_paragraphs"] > 0:
             progress = int((task_info["current_paragraph"] / task_info["total_paragraphs"]) * 100)

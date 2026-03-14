@@ -24,3 +24,15 @@ def test_no_false_positive_on_substrings():
     paragraph = "This theorem is complex."
     matches = find_matching_terms(paragraph, terms)
     assert matches == {}
+
+def test_full_info_dict_support():
+    """测试 regex 引擎下对全量信息字典的支持"""
+    terms = {
+        "priority": {"term": "priority", "translation": "优先级", "reason": "context"},
+    }
+    paragraph = "The priority is high."
+    matches = find_matching_terms(paragraph, terms)
+    
+    assert "priority" in matches
+    assert matches["priority"]["translation"] == "优先级"
+    assert matches["priority"]["reason"] == "context"

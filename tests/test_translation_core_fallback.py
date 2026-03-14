@@ -61,6 +61,7 @@ async def test_fallback():
     print(f"Result Success: {result.success}")
     print(f"Result Content (Raw): {result.content!r}")
     print(f"Result Notes: {result.notes}")
+    print(f"Result Matched Terms: {result.matched_terms_delta}") # Check new field
     print("-" * 50)
     
     # Expected content verification:
@@ -71,7 +72,12 @@ async def test_fallback():
     print(f"Expected Content (Raw): {expected_content!r}")
     
     if result.success and result.content == expected_content:
-        print("TEST PASSED: Fallback logic worked for complex content.")
+        # Also check that matched_terms_delta is present (empty list expected here)
+        if isinstance(result.matched_terms_delta, list):
+             print("TEST PASSED: Fallback logic worked for complex content and structure is correct.")
+        else:
+             print("TEST FAILED: matched_terms_delta is missing or invalid.")
+             sys.exit(1)
     else:
         print("TEST FAILED: Fallback logic did not produce expected result.")
         sys.exit(1)

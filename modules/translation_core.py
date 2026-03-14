@@ -30,6 +30,7 @@ class TranslationResult(BaseModel):
     tokens: int
     repair_tokens: int
     new_terms_delta: List[Dict[str, str]]
+    matched_terms_delta: List[Dict[str, str]] = []
     header_path: List[str]
     success: bool = True
     error: Optional[str] = None
@@ -41,8 +42,8 @@ class TranslationCore:
     async def execute_translation_step(
         self,
         segment: Dict[str, Any],
-        terms_dict: Dict[str, str],
-        aggregated_new_terms: Dict[str, str],
+        terms_dict: Dict[str, Any],
+        aggregated_new_terms: Dict[str, Any],
         tracker_state: Optional[Any] = None,
         repair_policy: RepairPolicy = RepairPolicy.RETRY_MAX_5,
         terminology_policy: TerminologyPolicy = TerminologyPolicy.MERGE_ON_CONFLICT,
@@ -71,6 +72,7 @@ class TranslationCore:
                 tokens=0,
                 repair_tokens=0,
                 new_terms_delta=[],
+                matched_terms_delta=[],
                 header_path=header_path,
                 success=True
             )
@@ -82,6 +84,21 @@ class TranslationCore:
         
         matched_terms = await asyncio.to_thread(find_matching_terms, paragraph_text, current_terms)
         
+        matched_terms_list = []
+        for term, info in matched_terms.items():
+            if isinstance(info, dict):
+                matched_terms_list.append({
+                    "term": term,
+                    "translation": info.get('translation', ''),
+                    "reason": info.get('reason', '')
+                })
+            else:
+                matched_terms_list.append({
+                    "term": term,
+                    "translation": str(info),
+                    "reason": ""
+                })
+
         # 2. 构造 Prompt
         prompt = self.llm_service.create_prompt(paragraph_text, matched_terms)
         
@@ -138,7 +155,10 @@ class TranslationCore:
                         
                         # 如果该术语已在权威词表中，且译名不一致
                         if term in current_terms:
-                            expected = current_terms[term]
+                            # Check if current_terms value is dict or string
+                            expected_val = current_terms[term]
+                            expected = expected_val.get('translation', '') if isinstance(expected_val, dict) else str(expected_val)
+                            
                             if translation != expected:
                                 corrections[term] = expected
                 
@@ -201,6 +221,7 @@ class TranslationCore:
                     tokens=tokens,
                     repair_tokens=repair_tokens,
                     new_terms_delta=response_data.get("new_terms", []),
+                    matched_terms_delta=matched_terms_list,
                     header_path=header_path,
                     success=True
                 )
@@ -236,6 +257,7 @@ class TranslationCore:
                     tokens=tokens, 
                     repair_tokens=repair_tokens,
                     new_terms_delta=[], # 术语录入异常，不返回新术语
+                    matched_terms_delta=matched_terms_list,
                     header_path=header_path,
                     success=True # 标记为成功以便写入文件，但带有警告
                 )
@@ -271,6 +293,7 @@ class TranslationCore:
                     tokens=tokens,
                     repair_tokens=repair_tokens,
                     new_terms_delta=[], 
+                    matched_terms_delta=matched_terms_list,
                     header_path=header_path,
                     success=True
                 )
@@ -281,6 +304,7 @@ class TranslationCore:
             tokens=0,
             repair_tokens=0,
             new_terms_delta=[],
+            matched_terms_delta=[],
             header_path=header_path,
             success=False,
             error=f"Max retries ({max_api_retries}) reached. Last error: {last_error}"
