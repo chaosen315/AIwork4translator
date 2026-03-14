@@ -6,6 +6,7 @@ modules/api_tool.py
 modules/config.py
 modules/count_tool.py
 modules/csv_process_tool.py
+modules/log_manager.py
 modules/markitdown_tool.py
 modules/read_tool.py
 modules/terminology_tool.py
@@ -23,8 +24,11 @@ tests/test_api_direct.py
 tests/test_api_parser.py
 tests/test_api_providers.py
 tests/test_concurrency_flow.py
+tests/test_finalize_flow.py
 tests/test_get_valid_path.py
 tests/test_join_and_write.py
+tests/test_log_manager.py
+tests/test_main_replay.py
 tests/test_markitdown_tool_title.py
 tests/test_matching_terms.py
 tests/test_matching_terms_aho.py

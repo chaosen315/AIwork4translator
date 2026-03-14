@@ -21,6 +21,7 @@ AIwork4translator 是一个专为技术文档设计的翻译工具。通过**Aho
   - **CLI**：偏好记忆、极简操作。
   - **WebUI**：双栏实时预览、所见即所得。
 - **📄 多格式支持**：原生支持 Markdown，集成 [MarkItDown](https://github.com/microsoft/markitdown) 支持 PDF/Word/Excel 等格式转换。
+- **📦 多格式导出**：翻译完成后可基于 `_intermediate.json` 一键导出 `docx/pdf/epub/xlsx`，便于分发与排版复用。
 
 ---
 
@@ -77,6 +78,21 @@ CLI 版本专注于效率，适合批量处理和大文件翻译。
     *   **无词表**：输入 `n`，程序可生成空白词表（*功能调整中*）。
     *   **有词表**：输入 `y` 并提供 CSV 路径。翻译结束后，可选择是否将新发现的术语合并回原表。
 4.  **非 MD 文件**：程序会自动调用 MarkItDown 转换为 Markdown，转换后需用户确认继续。
+5.  **导出文件**：翻译结束后可按提示选择导出格式（`docx/pdf/epub/xlsx`）。导出以 `_intermediate.json` 为输入源，通常可在不重新翻译的情况下重复导出以调整排版。
+
+### 导出与预览（脚本）
+
+如果你已经有导出的文件（`.docx/.pdf/.epub`），可以用脚本快速查看它们的结构（标题/目录/第一页文本抽取）：
+
+```bash
+uv run python scripts/preview_export_outputs.py "<导出文件的基础路径（不带扩展名）>"
+```
+
+示例：
+
+```bash
+uv run python scripts/preview_export_outputs.py "input_files/《赤红传说》112-127"
+```
 
 ### WebUI 版本
 
