@@ -84,34 +84,33 @@ P4 end.
 
 @pytest.mark.asyncio
 async def test_run_translation_loop_flow():
-    # 1. Mock Objects
+    # 1. Mock Objects（TranslationCore 走异步接口，mock 必须可 await）
     mock_llm = MagicMock()
-    # Mock call_ai_model_api to return valid result
     mock_llm.create_prompt.return_value = "prompt"
-    mock_llm.call_ai_model_api.return_value = (
+    mock_llm.call_ai_model_api_async = AsyncMock(return_value=(
         {
             "translation": "Translated Content", 
             "notes": "Some notes", 
             "new_terms": [{"term": "foo", "translation": "bar", "reason": "test"}]
         }, 
         100 # tokens
-    )
-    mock_llm.repair_json.return_value = (
+    ))
+    mock_llm.repair_json_async = AsyncMock(return_value=(
         {
             "translation": "Repaired Content", 
             "notes": "Repaired notes", 
             "new_terms": []
         },
         50
-    )
-    mock_llm.rewrite_with_glossary.return_value = (
+    ))
+    mock_llm.rewrite_with_glossary_async = AsyncMock(return_value=(
         {
             "translation": "Rewritten Content", 
             "notes": "Rewritten notes", 
             "new_terms": []
         },
         50
-    )
+    ))
     
     core = TranslationCore(mock_llm)
     
@@ -153,7 +152,7 @@ async def test_run_translation_loop_flow():
         assert total_tokens == 200 # 100 * 2
         
         # Check LLM calls
-        assert mock_llm.call_ai_model_api.call_count == 2
+        assert mock_llm.call_ai_model_api_async.call_count == 2
         
         # Check Write calls
         assert mock_write.call_count == 2

@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -12,7 +12,7 @@ from modules.api_tool import LLMService
 
 @pytest.mark.asyncio
 async def test_fallback():
-    # Mock LLMService
+    # Mock LLMService（异步化重构后 TranslationCore 调用 *_async 接口）
     mock_llm = MagicMock(spec=LLMService)
     
     # Complex content with MD syntax, Chinese quotes, and English quotes (escaped)
@@ -36,10 +36,10 @@ async def test_fallback():
     }
     
     # Mock methods
-    mock_llm.call_ai_model_api.return_value = (error_response, 100)
+    mock_llm.call_ai_model_api_async = AsyncMock(return_value=(error_response, 100))
     mock_llm.create_prompt.return_value = "prompt"
-    mock_llm.repair_json.return_value = (error_response, 50)
-    mock_llm.rewrite_with_glossary.return_value = ({"translation": "rewritten", "new_terms": []}, 10)
+    mock_llm.repair_json_async = AsyncMock(return_value=(error_response, 50))
+    mock_llm.rewrite_with_glossary_async = AsyncMock(return_value=({"translation": "rewritten", "new_terms": []}, 10))
 
     core = TranslationCore(mock_llm)
     
@@ -71,16 +71,10 @@ async def test_fallback():
     
     print(f"Expected Content (Raw): {expected_content!r}")
     
-    if result.success and result.content == expected_content:
-        # Also check that matched_terms_delta is present (empty list expected here)
-        if isinstance(result.matched_terms_delta, list):
-             print("TEST PASSED: Fallback logic worked for complex content and structure is correct.")
-        else:
-             print("TEST FAILED: matched_terms_delta is missing or invalid.")
-             sys.exit(1)
-    else:
-        print("TEST FAILED: Fallback logic did not produce expected result.")
-        sys.exit(1)
+    assert result.success, "Fallback logic did not produce a successful result"
+    assert result.content == expected_content, "Fallback content mismatch"
+    assert isinstance(result.matched_terms_delta, list), "matched_terms_delta is missing or invalid"
+    print("TEST PASSED: Fallback logic worked for complex content and structure is correct.")
 
 if __name__ == "__main__":
     asyncio.run(test_fallback())
