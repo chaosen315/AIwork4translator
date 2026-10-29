@@ -3,233 +3,227 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-Precise technical-document translation powered by glossary-aware prompts and robust Markdown segmentation. This project provides both CLI and WebUI with a unified module layer.
+> **Precise terminology control, professional document translation.**
 
-## Latest Update (2025/12/24)
+AIwork4translator is an AI translation tool for professional documents — technical docs, long-form narratives, novels, and rulebooks. It identifies and protects proper nouns during translation through **glossary-driven matching + Aho-Corasick automaton + regex**, keeping terminology consistent. Markdown is supported natively; PDF/Word/Excel/HTML inputs are converted via MarkItDown. Both CLI and WebUI workflows are available, and results can be exported to DOCX/PDF/EPUB/XLSX.
 
-### 🔍 Mid-Page Sentence Continuation Detection (English Papers)
-Added sentence-continuation detection optimized for English academic papers:
-- **Mid-page break heuristic**: Uses hard veto + scoring to avoid false merges (e.g., sentence-ending punctuation, abbreviation endings)
-- **Skip image blocks**: Merge logic can skip image segments to avoid treating non-text as merge candidates
-- **Preserve ordering**: Skipped image blocks are kept in the correct relative position to maintain document structure
+[简体中文](./README.md) | [Changelog](./CHANGELOG.md)
 
-### ⚡ Major Concurrency Performance Breakthrough
-We have implemented a brand-new concurrent translation architecture, bringing significant performance improvements:
-- **Queue + Worker Pool Mode**: Adopts `asyncio.Queue` + worker pool architecture, supporting 6 concurrent worker threads
-- **Performance Improvement**: 81 pages of content reduced from the original 3 hours to within 30 minutes, **performance improved by approximately 6x**
-- **Order Guarantee**: Through paragraph number sorting and write lock mechanism, ensures translation results are output in original order
-- **Smart Scheduling**: Supports flexible adjustment of concurrency through `Currency_Limit` environment variable (default 5, maximum does not exceed RPM, i.e., requests per minute limit)
+---
 
-### 🛡️ Exception Protection and Interruption Recovery
-- **Interactive Failure Recovery**: When the number of consecutive API failures reaches the limit, the program no longer exits directly, but pauses and offers options: users can choose to "reset failure count and continue retrying" or "save current progress and exit".
-- **Manual Interruption Protection**: Captures `Ctrl+C` interrupt signals to ensure that the accumulated glossary and remaining untranslated original text can be safely saved when the user manually stops the program.
-- **Resume Support**: The program automatically locates and saves the untranslated part as a `_rest.md` file, facilitating subsequent translation continuation.
-- **API Content Auto-Repair**: Implemented automatic detection and paragraph-level retry mechanisms for JSON format errors returned by the API, preventing program crashes caused by single parsing failures.
+## Latest Update (2026/03/14)
 
-### 🏗️ Core Architecture Refactoring
-- **Unified Translation Core**: Added `TranslationCore` module, unifying CLI and WebUI translation logic, eliminating code duplication
-- **Asynchronous Diagnostics**: Introduced non-blocking API diagnostics and global error state management, improving system stability
-- **Type Safety**: Unified terminology aggregation forms, resolving type inconsistency issues in concurrent environments
+- **Blueprint + append-only log write architecture**: during translation only JSONL logs are appended; the final Markdown is assembled once at the end, greatly reducing late-stage I/O latency on long documents.
+- **Millisecond-level preview**: the WebUI preview now aggregates content from memory/logs instead of reading files from disk.
+- **Atomic final write**: the final Markdown file is generated in one atomic operation at the end of the task, avoiding file-lock contention.
+- **Multi-format export**: export DOCX / PDF / EPUB / XLSX from `_intermediate.json`, plus `scripts/preview_export_outputs.py` to preview the structure of exported files.
+- **Async Provider interfaces**: all LLM providers now expose async calls, improving Ctrl+C interrupt responsiveness.
+- **Full-info glossary dictionary**: terminology entries support `term/translation/reason`, with optimized write performance.
 
-### 🚀 Interaction Experience and Terminology Management
-- **CLI Preference Memory**: Automatically loads the last used API platform, file path, and other configurations at startup; simply press Enter to reuse them.
-- **Terminology Union Matching**: Real-time collection of "new terms" during translation, forming a union with the CSV glossary for matching to maximize term hit rate.
-- **Controllable Merge Switch**: At the end of translation or upon interruption, users can interactively choose whether to merge newly collected terms into the original glossary; if not merged, they are automatically exported as an independent CSV file (`original_filename_timestamp.csv`).
-- **Proper Noun Matching Optimization**: More robust case normalization for all-uppercase/capitalized proper nouns (e.g., HOPKINS/Hopkins).
-
-> Plan Change: Due to the current suboptimal performance of the "Blank Glossary Generation" function, it has been decided to temporarily remove it. It may be refactored or discontinued in the future depending on the situation.
-
-## Table of Contents
-- Overview
-- Key Features
-- Project Structure (Unified Root)
-- Installation
-- Quick Start (uv)
-- Usage
-  - CLI
-  - WebUI
-- Environment & Defaults
-- Testing
-- FAQ
-- Changelog & Migration Notes
-- Roadmap
-- Contact
-
-## Overview
-AIwork4translator focuses on translating technical documents while preserving terminology accuracy. It detects and protects domain-specific terms and provides an editor workflow to review translations efficiently.
-
-### Principles
-- **Glossary-first prompts**: Aho-Corasick automaton and regex matching identify domain terms per segment; prompts instruct the model to use exact translations consistently.
-- **High Efficiency**: Compared to typical RAG uploads for small glossaries, early tests show ~99% less extra token overhead and ~35% more term hits. Overall quality improves due to stable terminology.
-- **Adaptive**: Supports plural normalization (e.g., "outlaws" -> "outlaw") and smart article handling ("the Outlaw" matches "an outlaw").
-- **Continuous Improvement**: Since no glossary can be complete, newly detected terms are automatically highlighted/summarized in the output to aid review and glossary updates.
+See [CHANGELOG.md](./CHANGELOG.md) for the full history.
 
 ## Key Features
-- **Terminology detection & protection**: Efficient Aho-Corasick matching with plural/article normalization.
-- **Multi-format input support**: Native `.md/.txt`, and conversion for PDF/Word/Excel/HTML via MarkItDown.
-- **Multiple LLM providers**: Kimi, OpenAI (GPT), DeepSeek, and optional local models via Ollama.
-- **CLI and WebUI modes**: Unified core logic with interactive CLI and feature-rich WebUI.
-- **CLI Preference Memory**: Automatically remembers last used provider and file paths for faster startup.
-- **Two-column Markdown editor**: WebUI split-view (original vs translation) with live progress.
-- **Real-time progress**: Live polling and safe autosave after completion.
-- **Interruption Protection & Recovery**: Supports Ctrl+C safe interruption, automatically saving progress and untranslated content.
-- **Interactive Failure Recovery**: Provides pause and retry options upon consecutive API failures to prevent accidental task termination.
-- **Interactive confirmation**: For non-Markdown conversion steps.
-- **Optional empty glossary generation**: Via NER (CLI) (Note: planned temporary deprecation; see Roadmap).
-- **Structured translation**: Smart segmentation based on Markdown headers.
-- **Dynamic terminology management (refactor core)**: Real-time union of new terms with the CSV glossary for matching; end-of-run merge switch; paragraph-level retries for stability.
 
-## Project Structure (Unified Root)
-```
-project_root/
-├── data/
-│   ├── .env                 # Environment configuration (API keys, model parameters, etc.)
-│   └── README_en.md
-├── models/
-│   └── dbmdz/bert-large-cased-finetuned-conll03-english-for-ner/
-├── modules/                 # Unified business modules (core translation logic)
-│   ├── api_tool.py          # LLMService, returns (content, tokens), no RAG cache
-│   ├── config.py            # GlobalConfig (env-first)
-│   ├── read_tool.py         # Structured Markdown segmentation
-│   ├── count_tool.py        # Paragraph counting (mirrors segmentation logic)
-│   ├── csv_process_tool.py  # Aho-Corasick term matching & CSV validation
-│   ├── markitdown_tool.py   # Non-Markdown → Markdown conversion
-│   ├── terminology_tool.py  # Glossary management (save, merge, format)
-│   ├── translation_core.py  # Translation core engine (encapsulates unified translation workflow)
-│   └── write_out_tool.py    # Structured/flat writing (no "# end" by default)
-├── services/                # Service layer (async diagnostics, global state management)
-│   ├── __init__.py
-│   └── diagnostics.py       # Async diagnostics management (singleton pattern)
-├── templates/               # WebUI templates
-│   ├── index.html           # File upload page
-│   └── editor.html          # Two-column editor page
-├── static/                  # WebUI static resources
-│   ├── style.css            # Global styles
-│   ├── script.js            # Homepage interaction logic
-│   └── editor.js            # Editor and polling logic
-├── uploads/
-├── app.py                   # WebUI entry (provides main())
-├── main.py                  # CLI entry (interactive, with preference persistence)
-├── baseline.py              # Baseline CLI (unified API call, no RAG cache)
-└── pyproject.toml           # Scripts: CLI/WebUI
+- **🎯 Proper-noun protection**: Aho-Corasick based glossary matching with plural normalization and smart article handling.
+- **📚 Dynamic terminology management**: new terms are collected in real time during translation and can be merged interactively or exported separately.
+- **⚡ High-concurrency architecture**: Queue + Worker Pool, roughly 6x faster than the serial workflow on large files.
+- **🛡️ Robust failure recovery**: automatic JSON repair, resume-from-checkpoint, safe Ctrl+C interruption, and interactive failure recovery.
+- **🖥️ Dual interfaces**: CLI (preference memory, minimal interaction) + WebUI (two-column live preview, WYSIWYG editing).
+- **📄 Multi-format input**: native Markdown, plus PDF/Word/Excel/HTML via [MarkItDown](https://github.com/microsoft/markitdown).
+- **📦 Multi-format export**: one-click DOCX/PDF/EPUB/XLSX export from `_intermediate.json`.
+- **🔌 Multiple providers**: Kimi / OpenAI / DeepSeek / SiliconFlow / Gemini / Doubao (current implementations).
+
+## Note on Early-Stage Numbers
+
+The repository description mentions "+35% proper-noun recognition" and "99% token savings vs traditional RAG". These numbers come from early small-sample experiments; the repository currently contains no reproducible evaluation scripts, datasets, or comparison data. A reproducible evaluation is scheduled for the next iteration ([issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)); the repository description and this document will be reconciled once the results are available.
+
+## Quick Start
+
+### 1. Prerequisites
+
+This project uses `uv` for dependency and environment management:
+
+```bash
+uv sync --frozen   # install dependencies from uv.lock (creates .venv automatically)
 ```
 
-## Installation
-- Requirements: Python 3.11+
-- Dependency manager: `uv`
-- Virtual environment: `.venv` (default)
+On Windows, activate the environment with `.venv\Scripts\activate`; `uv run` also works without manual activation.
 
-```
-uv sync
-```
+### 2. Configure the API
 
-## Quick Start (uv)
-```
-# Sync project dependencies (creates .venv)
-uv sync
-
-# Install / remove dependencies
-uv add <package>
-uv remove <package>
-
-# Run CLI (recommended)
-uv run main.py
-# Or
-python main.py
-
-# Run WebUI
-python app.py
-# Or script entry
-program-translator-webui
-
-# Run tests
-python -m pytest
+```bash
+cp data/.env.example data/.env
 ```
 
-## Important Notes for Translation
+Fill in at least the key of the provider you plan to use. Keep `SYSTEM_PROMPT` / `BASE_PROMPT` from the example as-is (the translation workflow and the JSON output contract depend on them):
 
-- **Configuration & secrets**: Set API keys in `data/.env` and never commit secrets. On ≥3 consecutive API failures, run the CLI API test and check your network/proxy. Kimi defaults: `BASE_URL=https://api.moonshot.cn/v1`, `MODEL=kimi-k2-turbo-preview`.
-- **Glossary quality & performance**: CSV must have 2 columns, UTF-8 encoding, no empty rows, and unique source terms. Large glossaries are supported efficiently via Aho-Corasick algorithm. Plural forms are automatically handled.
-- **CLI Preferences**: The CLI remembers your last choices (provider, file paths) in `data/.prefs.json`. Press Enter to accept the default value shown in `[...]`.
-- **Input & structure**: Prefer native Markdown. Non-Markdown files are auto-converted; please review the converted file before continuing. Structured mode relies on heading levels—use `#`/`##` reasonably.
-- **Paragraphs & large files**: Very long paragraphs are split intelligently. Large files take longer; WebUI recommends ≤10MB. CLI shows progress as `[current/total]`.
-- **Consistency**: Lower `temperature` improves term consistency. The prompt explicitly injects term mappings to stabilize outputs.
-- **Local models**: For Ollama, set `OLLAMA_BASE_URL` and `OLLAMA_MODEL` in `.env`. Ensure the service is running before use.
-- **Logging & outputs**: CLI prints `Total time: xh xm xs` (Chinese format enabled). `counting_table.csv` records raw seconds and tokens. WebUI logs include timestamps.
+```ini
+KIMI_API_KEY=sk-xxxxxxxxxxxxxxxx
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+KIMI_MODEL=kimi-k2-turbo-preview
+```
+
+The default provider is `kimi`.
+
+### 3. Run
+
+```bash
+uv run main.py    # CLI
+uv run app.py     # WebUI: open http://localhost:8008 in a browser
+```
+
+### 4. Run Tests
+
+```bash
+uv run python -m pytest -q
+```
+
+Current baseline: **94 passed, 5 skipped** (provider tests are skipped automatically when the corresponding API key is missing).
 
 ## Usage
+
 ### CLI
-- Run `uv run main.py` (or `python main.py`)
-- Select the provider (kimi/gpt/deepseek/ollama) - defaults to last used
-- Enter the input file path - defaults to last used
-  - If the file is not Markdown, it will be converted via MarkItDown and you will be prompted to continue (y/n)
-#### Glossary Handling
 
-1. If you don't have a glossary CSV, enter `n`. The program will automatically create a blank glossary file.
-   - Filename format: `[Original_Filename]_output_terminology.csv`
-   - You can fill in this file after translation (or interruption) for future use.
-   - *Note: NER-based automatic generation is temporarily deprecated.*
+1. Run `uv run main.py`.
+2. Choose a provider (the last choice is remembered; press Enter to reuse it).
+3. Enter the input file path (remembered across runs; non-Markdown files are converted via MarkItDown first and require confirmation).
+4. Handle the glossary:
+   - Enter `n`: generate a blank glossary (with sample entries); after translation you can choose whether to merge newly found terms.
+   - Enter `y`: provide a CSV/XLSX glossary and choose whether to merge new terms back into it (if not, they are saved as a separate CSV).
+5. Choose whether to enable concurrency.
+6. After translation, save the output and glossary, then optionally export to DOCX/PDF/EPUB/XLSX. `counting_table.csv` records input/output lengths, tokens, and elapsed time.
 
-2. If you have a glossary CSV, enter `y` to provide the file path.
-   - Enter the path to your CSV glossary (direct `.xlsx` input is supported; it will be auto-converted).
-   - **New Term Merge Option**:
-     - After entering the path, you will be asked: "Merge new terms into the glossary? (y/n)".
-     - Select `y`: Newly discovered terms will be appended to your original CSV (deduplicated) and saved as a backup.
-     - Select `n`: New terms will be saved separately in a new CSV file, leaving the original file untouched.
+Interruption and recovery:
+
+- `Ctrl+C` saves the accumulated glossary and the untranslated remainder (`_rest.md`);
+- concurrency mode can resume from `_translation_log.jsonl`;
+- after `MAX_RETRIES` consecutive failures, an interactive recovery prompt appears (retry or save and exit).
 
 ### WebUI
-- Run `uv run app.py`
-- Open `http://localhost:8008/`
-- On the home page:
-  - Upload original file (`.md` or convertible format) and validate
-  - Upload glossary CSV and validate
-  - Choose provider, click “Use Two-Column Editor”, then in the editor page click “Start Translation”
-- Endpoints tested: `/validate-file`, `/start-translation`, `/translation-progress`, `/save-content`, `/download`, `/open-file`
-- After completion, autosave checks every ~20 seconds
 
-## Environment & Defaults
-- Environment file: `data/.env`
-- Default provider config for Kimi:
-  - `KIMI_BASE_URL=https://api.moonshot.cn/v1`
-  - `model=kimi-k2-turbo-preview`
-- Suggested parameters: `max_tokens=2048`, `temperature=0.7`, `top_p=0.95`
-- Keep API keys secure and do not commit to the repository
+1. Run `uv run app.py` and open http://localhost:8008.
+2. Upload a `.md` file (or a convertible format) and an optional glossary.
+3. In the two-column editor (source left, translation right), click "Start Translation" for live streaming updates.
+4. Online editing, Ctrl+S manual save, autosave, and translation download are supported.
+
+Main endpoints: `/validate-file`, `/start-translation`, `/translation-progress`, `/save-content`, `/download`, `/open-file`.
+
+### Glossary Format
+
+Standard CSV (UTF-8, BOM allowed) with two columns: source and target. Source terms must be unique, with no empty rows. `.xlsx` is also accepted (converted to CSV automatically). An optional third column `reason` records the naming rationale.
+
+| Source | Target | Reason (optional) |
+| :--- | :--- | :--- |
+| Server | 服务器 | common term |
+| Outlaw | 法外之徒 | in-universe proper noun |
+
+### Export & Preview
+
+The CLI can export directly after translation. To inspect the structure of an exported file (headings / TOC / first-page text):
+
+```bash
+uv run python scripts/preview_export_outputs.py "<base path without extension>"
+```
+
+Example:
+
+```bash
+uv run python scripts/preview_export_outputs.py "input_files/《赤红传说》112-127"
+```
+
+## Advanced Configuration
+
+### Environment Variables (`data/.env`)
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `KIMI_API_KEY` / `KIMI_BASE_URL` / `KIMI_MODEL` | Kimi configuration | base_url `https://api.moonshot.cn/v1`, model `kimi-k2-turbo-preview` |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `GPT_MODEL` | OpenAI configuration | `https://api.openai.com/v1` / `gpt-realtime` |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` / `DEEPSEEK_MODEL` | DeepSeek configuration | — / `deepseek-chat` |
+| `SILICON_API_KEY` / `SILICON_JSON_URL` / `SILICON_JSON_MODEL` | SiliconFlow configuration | — / — |
+| `GEMINI_API_KEY` / `GEMINI_BASE_URL` / `GEMINI_MODEL` | Gemini configuration | — / `gemini-2.5-flash` |
+| `DOUBAO_API_KEY` / `DOUBAO_BASE_URL` / `DOUBAO_MODEL` | Doubao configuration | — / `doubao-seed-1-6-251015` |
+| `SYSTEM_PROMPT` | System prompt (two-step translation workflow + JSON output contract) | required, see `.env.example` |
+| `BASE_PROMPT` | Additional user prompt (terminology / JSON constraints) | required, see `.env.example` |
+| `Requests_Per_Minute` | Requests per minute limit (0 or negative = unlimited) | `10` |
+| `Currency_Limit` | Max concurrent workers (effective value is min(this, RPM)) | `6` |
+| `MAX_RETRIES` | Consecutive-failure circuit-breaker threshold | `3` |
+| `PRESERVE_STRUCTURE` | Whether to enable structured mode | `true` |
+| `MAX_CHUNK_SIZE` | Maximum length of a single segment | `4000` |
+| `STRUCTURED_OUTPUT` | Whether to parse model output as structured JSON | `true` |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Legacy reserved keys: Ollama support is **not implemented** in the current version | — |
+
+### Provider Notes
+
+Implemented providers (see `modules/api_tool.py`): `kimi`, `gpt`, `deepseek`, `silicon`, `gemini`, `doubao`. Gemini and Doubao rely on each vendor's structured-output SDK and are relatively new / not yet fully validated. Ollama integration is not implemented at this time.
+
+### Translation Modes
+
+- **Structured mode**: detects H1–H6 headings and splits by section — recommended for native Markdown;
+- **Flat mode**: ignores headings and streams paragraph by paragraph — suitable for converted documents (PDF/Word, etc.).
+
+## Project Structure
+
+```text
+project_root/
+├── data/                    # configuration (.env.example tracked; .env ignored)
+├── modules/                 # business modules
+│   ├── api_tool.py          # LLMService: provider adapters, prompts, structured parsing/JSON repair, glossary rewrite
+│   ├── translation_core.py  # unified translation core: term matching → prompt → retry/repair → consistency → result
+│   ├── read_tool.py         # structured segmentation, mid-page sentence merging, image skipping
+│   ├── write_out_tool.py    # blueprint JSON + append-only log → final Markdown
+│   ├── log_manager.py       # JSONL incremental log (resume / preview)
+│   ├── csv_process_tool.py  # Aho-Corasick term matching, CSV/XLSX validation
+│   ├── terminology_tool.py  # glossary load / merge / save
+│   ├── export_tool.py       # DOCX/PDF/EPUB/XLSX export
+│   ├── markitdown_tool.py   # non-Markdown → Markdown conversion
+│   ├── count_tool.py        # paragraph / word count
+│   └── config.py            # global configuration (env)
+├── services/diagnostics.py  # async API diagnostics and global error state
+├── templates/ static/       # WebUI (FastAPI + Jinja + vanilla JS)
+├── scripts/                 # install / export preview / check scripts
+├── tests/                   # pytest (current baseline: 94 passed / 5 skipped)
+├── reviews/                 # historical AI review reports (2025-11 to 2025-12)
+├── main.py                  # CLI entry point
+├── app.py                   # WebUI entry point
+├── baseline.py              # no-glossary baseline script (for evaluation; paths are examples and need editing)
+├── pyproject.toml           # dependencies and script entry points (uv.lock / requirements.txt kept in sync)
+└── devdiary.md / CHANGELOG.md
+```
 
 ## Testing
-- Run all tests: `python -m pytest`
-- Tests are aligned to the unified root structure
 
-## FAQ
-- The editor shows progress as segments are processed; content updates incrementally
-- Non-Markdown files are converted and require a user confirmation before translation
-- Default writing mode does not append `# end` in flat mode (to match CLI/WebUI behavior)
+```bash
+uv run python -m pytest -q    # current: 94 passed, 5 skipped
+```
 
-## Changelog & Migration Notes
-- 2025-12-04: Added CLI preference persistence, Aho-Corasick term matching optimization, and plural/article normalization.
-- 2025-11-29: Unified root structure (merged CLI/WebUI), removed RAG cache, aligned modules, updated script entries, cleaned legacy directories
+- Tests that require per-provider API keys are skipped automatically when the key is missing;
+- Coverage: translation core (retry / JSON repair / glossary rewrite / fallback), concurrency flow, structured reading and mid-page merging, incremental-log writing, glossary matching, export, CLI preferences, etc.;
+- No CI yet: GitHub Actions will be added to run pytest on pull requests.
 
 ## Roadmap
-### High Priority
-- **Async rate limiter**: Introduce an async RPM limiter based on `asyncio.Semaphore` + a time window to reduce threadpool blocking under concurrency
-- **Fallback for non-JSON mode**: Add lightweight progress markers (e.g., queue index mirror) to unify `rest.md` fallback behavior outside JSON mode
-- **Mid-page break algorithm**: Extend the signal set (quotes, parentheses, colon continuations) to improve edge cases like proper nouns / uppercase continuations
 
-### Medium Priority
-- **Image reinsertion strategy**: Extract reinsertion as a strategy (e.g., "follow text", "preserve relative position", "collect at section end") for different publishing formats
-- **Header stack refactor**: Move header-stack state to a dedicated context (e.g., tracker state / write context) for clarity and testability
-- **Batch processing**: Add chunked processing / rolling windows to reduce peak memory usage on very large documents
+### Next Iteration (Scheduled)
 
-### Low Priority
-- **Config contract docs**: Clarify key `.env` items and provider behavior differences
-- **MinerU integration**: Enhance Markdown parsing performance with MinerU
-- **CAP-like interaction**: Add a table-style UI (sentence-aligned source/target) for efficient editing
+- **Reproducible terminology evaluation** ([issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)): 3 documents (technical doc / rulebook / novel) with glossaries and manual annotations; Group A (no glossary baseline) vs Group B (full-glossary RAG-style injection) vs Group C (this project's segment-level glossary injection); metrics = term hit rate (primary), extra token overhead, elapsed time; each group runs each document at least twice with raw counts retained. The conclusions will be used to reconcile the early-stage numbers in the repository description and this document.
 
-### Completed (2025/12/24)
-- ✅ Mid-page sentence continuation detection + image skipping merge
-- ✅ Queue-based worker-pool concurrency architecture
-- ✅ API auto-repair + two-level JSON degradation strategy
-- ✅ CLI preference memory + dynamic glossary management
+### Later
 
+- Stability: async RPM rate limiter, fallback for untranslated content in non-JSON mode, broader mid-page break signals, strategy-based image re-insertion, write-context refactor, batched processing for very large documents;
+- Engineering: GitHub Actions + pytest CI; cleanup of tracked `__pycache__` / `egg-info` / local internal docs;
+- Documentation: unified revision of the public numbers and README once evaluation results are in.
 
-## Contact
-Email: chasen0315@gmail.com (reply within 24 hours by 2025-12-29)
+## Known Limitations
+
+- Terminology depends on a supplied glossary — **no automatic term recognition** (the NER capability was removed on 2025-12-27);
+- The "+35% recognition / 99% token savings" figures come from early small-sample experiments and are not currently reproducible; they await evaluation;
+- Ollama integration is not implemented;
+- Export layout is based on Markdown structure, so complex layouts (tables, formulas, image positions) are limited; Chinese fonts for PDF depend on the runtime environment;
+- Memory usage and rate limiting for very large files still need improvement; the WebUI recommends files ≤10MB;
+- Designed for single-user local use; no multi-user authentication or cloud deployment.
+
+## Contact & License
+
+- Questions and suggestions: feel free to open an Issue;
+- Email: chasen0315@gmail.com;
+- License: [MIT](./LICENSE)

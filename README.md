@@ -1,91 +1,128 @@
 # AIwork4translator
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 > **精准的术语控制，专业的文档翻译。**
 
-AIwork4translator 是一个专为技术文档设计的翻译工具。通过**Aho-Corasick 自动机**与**正则过滤**技术，它能在翻译过程中精准识别并保护专有名词，确保术语的一致性。支持 Markdown、PDF、Word 等多种格式，提供 CLI 和 WebUI 两种交互方式。
+AIwork4translator 是一个面向专业文档的 AI 翻译工具，适合技术文档、长篇叙事、小说与规则书。它通过**词表驱动 + Aho-Corasick 自动机 + 正则匹配**在翻译过程中识别并保护专有名词，保证术语一致性；原生支持 Markdown，并通过 MarkItDown 接入 PDF/Word/Excel/HTML 等格式；提供 CLI 与 WebUI 两种交互方式；可导出 DOCX/PDF/EPUB/XLSX。
 
 [English](./README_en.md) | [更新日志](./CHANGELOG.md)
 
 ---
 
-## ✨ 核心特性
+## 最新更新（2026/03/14）
 
-- **🎯 专有名词保护**：基于 AC 自动机的高效术语匹配，支持复数归一化与冠词智能处理。
-- **📚 动态术语管理**：翻译过程中实时采集新术语，支持交互式合并与导出。
-- **⚡ 高并发架构**：采用 Queue + Worker Pool 模式，大文件翻译性能提升约 6 倍。
-- **🛡️ 健壮的异常恢复**：支持断点续传、API 自动修复、Ctrl+C 安全中断保护。
-- **🖥️ 双模交互**：
-  - **CLI**：偏好记忆、极简操作。
-  - **WebUI**：双栏实时预览、所见即所得。
-- **📄 多格式支持**：原生支持 Markdown，集成 [MarkItDown](https://github.com/microsoft/markitdown) 支持 PDF/Word/Excel 等格式转换。
-- **📦 多格式导出**：翻译完成后可基于 `_intermediate.json` 一键导出 `docx/pdf/epub/xlsx`，便于分发与排版复用。
+- **蓝图 + 增量日志写入架构**：翻译过程中只追加 JSONL 日志，结束时一次性合并生成 Markdown，显著降低长文档后期的 IO 延迟；
+- **毫秒级预览**：WebUI 预览改为从内存/日志聚合，不再依赖磁盘文件读取；
+- **原子化写入**：最终 Markdown 在任务结束时一次性生成，减少文件锁冲突；
+- **多格式导出**：基于 `_intermediate.json` 导出 DOCX / PDF / EPUB / XLSX，并提供 `scripts/preview_export_outputs.py` 结构预览脚本；
+- **Provider 异步接口**：所有 LLM Provider 增加异步调用，改善 Ctrl+C 中断响应；
+- **术语表全信息字典**：支持 `term/translation/reason` 结构并优化写入性能。
 
----
+完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
-## 🚀 快速开始
+## 核心特性
 
-本项目使用 `uv` 进行依赖管理，确保环境纯净且高效。
+- **🎯 专有名词保护**：基于 AC 自动机的术语匹配，支持复数归一化与冠词智能处理；
+- **📚 动态术语管理**：翻译过程中实时采集新术语，支持交互式合并与独立导出；
+- **⚡ 高并发架构**：Queue + Worker Pool，大文件翻译性能相比串行约 6 倍；
+- **🛡️ 健壮异常恢复**：JSON 自动修复、断点续传、Ctrl+C 安全中断、交互式故障恢复；
+- **🖥️ 双模交互**：CLI（偏好记忆、极简操作）+ WebUI（双栏实时预览、所见即所得）；
+- **📄 多格式输入**：原生 Markdown，集成 [MarkItDown](https://github.com/microsoft/markitdown) 支持 PDF/Word/Excel/HTML 等；
+- **📦 多格式导出**：翻译完成后基于 `_intermediate.json` 一键导出 DOCX/PDF/EPUB/XLSX；
+- **🔌 多 Provider**：Kimi / OpenAI / DeepSeek / SiliconFlow / Gemini / Doubao（当前实现）。
+
+## 关于早期数字的说明
+
+仓库描述中的「专有名词识别率 +35%」「相比传统 RAG 节省 99% token」来自早期小样本实验，仓库内目前没有可复现的评测脚本、测试集与对照数据。可复现评测已列为下一迭代任务（[issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)），结论出来后一并复核仓库描述与本文档的表述。
+
+## 快速开始
 
 ### 1. 环境准备
 
-```bash
-# 同步项目依赖（自动创建 .venv）
-uv sync
+本项目使用 `uv` 管理依赖与环境：
 
-# 激活环境（Windows）
-.venv\Scripts\activate
+```bash
+uv sync --frozen   # 按 uv.lock 安装依赖（自动创建 .venv）
 ```
+
+Windows 可执行 `.venv\Scripts\activate` 激活虚拟环境；也可以直接用 `uv run` 运行。
 
 ### 2. 配置 API
 
-在 `data/.env` 文件中配置您的 LLM 服务（默认支持 OpenAI 格式）：
+```bash
+cp data/.env.example data/.env
+```
+
+在 `data/.env` 中至少填写所选 Provider 的 Key。`SYSTEM_PROMPT` / `BASE_PROMPT` 保持示例内容即可（翻译流程与 JSON 输出契约依赖它们）：
 
 ```ini
-# data/.env
-API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-BASE_URL=https://api.moonshot.cn/v1
-MODEL=kimi-k2-turbo-preview
+KIMI_API_KEY=sk-xxxxxxxxxxxxxxxx
+KIMI_BASE_URL=https://api.moonshot.cn/v1
+KIMI_MODEL=kimi-k2-turbo-preview
 ```
 
-### 3. 运行程序
+默认 Provider 为 `kimi`。
 
-**命令行模式 (CLI)**
+### 3. 运行
+
 ```bash
-uv run main.py
-# 跟随引导选择文件与术语表即可
+uv run main.py    # CLI
+uv run app.py     # WebUI：浏览器打开 http://localhost:8008
 ```
 
-**网页界面 (WebUI)**
+### 4. 测试
+
 ```bash
-uv run app.py
-# 浏览器访问 http://localhost:8008
+uv run python -m pytest -q
 ```
 
----
+当前基线：**94 passed, 5 skipped**（未配置对应 Provider Key 时相关测试自动跳过）。
 
-## 📖 使用指南
+## 使用指南
 
-### 命令行版本 (CLI)
+### 命令行（CLI）
 
-CLI 版本专注于效率，适合批量处理和大文件翻译。
+1. 运行 `uv run main.py`；
+2. 选择 Provider（自动记住上次选择，回车沿用）；
+3. 输入原文路径（记住上次；非 Markdown 文件会先经 MarkItDown 转换并等待确认）；
+4. 处理术语表：
+   - 输入 `n`：生成空白词表（含示例条目），翻译结束后可选择是否合并新术语；
+   - 输入 `y`：提供 CSV/XLSX 词表路径，并选择是否将新术语合并回原表（不合并则另存新 CSV）；
+5. 选择是否启用并发模式；
+6. 翻译完成后保存译文与术语表，并按提示导出 DOCX/PDF/EPUB/XLSX；`counting_table.csv` 会记录输入/输出长度、token 与耗时。
 
-1.  **启动**：运行 `uv run main.py`。
-2.  **偏好记忆**：程序会自动记住上次使用的 API 平台和文件路径，下次启动直接回车即可。
-3.  **术语表**：
-    *   **无词表**：输入 `n`，程序可生成空白词表（*功能调整中*）。
-    *   **有词表**：输入 `y` 并提供 CSV 路径。翻译结束后，可选择是否将新发现的术语合并回原表。
-4.  **非 MD 文件**：程序会自动调用 MarkItDown 转换为 Markdown，转换后需用户确认继续。
-5.  **导出文件**：翻译结束后可按提示选择导出格式（`docx/pdf/epub/xlsx`）。导出以 `_intermediate.json` 为输入源，通常可在不重新翻译的情况下重复导出以调整排版。
+中断与恢复：
 
-### 导出与预览（脚本）
+- `Ctrl+C` 会保存已累积术语与未翻译原文（`_rest.md`）；
+- 并发模式基于 `_translation_log.jsonl` 支持断点续传；
+- 连续失败达到 `MAX_RETRIES` 时进入交互式恢复（重试或保存退出）。
 
-如果你已经有导出的文件（`.docx/.pdf/.epub`），可以用脚本快速查看它们的结构（标题/目录/第一页文本抽取）：
+### 网页界面（WebUI）
+
+1. 运行 `uv run app.py`，打开 http://localhost:8008；
+2. 上传 `.md`（或可转换格式）与可选词表；
+3. 进入双栏编辑器：左侧原文、右侧译文，点击「开始翻译」后实时流式更新；
+4. 支持在线编辑、Ctrl+S 手动保存、自动保存与下载译文。
+
+主要接口：`/validate-file`、`/start-translation`、`/translation-progress`、`/save-content`、`/download`、`/open-file`。
+
+### 术语表格式
+
+标准 CSV（UTF-8，允许带 BOM），两列：原文、译文；原文列不能重复、不能有空行。也支持 `.xlsx`（自动转换为 CSV）。可选第三列 `reason` 记录取名理由。
+
+| 原文 (Source) | 译文 (Target) | 理由 (可选) |
+| :--- | :--- | :--- |
+| Server | 服务器 | 通用术语 |
+| Outlaw | 法外之徒 | 作品内专名 |
+
+### 导出与预览
+
+翻译完成后 CLI 可直接导出；对已有导出文件可快速预览结构（标题/目录/首页文本）：
 
 ```bash
-uv run python scripts/preview_export_outputs.py "<导出文件的基础路径（不带扩展名）>"
+uv run python scripts/preview_export_outputs.py "<导出文件基础路径（不带扩展名）>"
 ```
 
 示例：
@@ -94,81 +131,99 @@ uv run python scripts/preview_export_outputs.py "<导出文件的基础路径（
 uv run python scripts/preview_export_outputs.py "input_files/《赤红传说》112-127"
 ```
 
-### WebUI 版本
+## 进阶配置
 
-WebUI 提供直观的双栏编辑器，适合需要实时校对的场景。
-
-1.  **启动**：运行 `uv run app.py`。
-2.  **流程**：
-    *   **上传**：在首页选择 `.md` 文件和可选的 `.csv` 词表。
-    *   **预览**：进入双栏编辑器，左侧原文，右侧译文。
-    *   **翻译**：点击“开始翻译”，右侧实时流式更新。
-    *   **编辑与保存**：支持直接编辑译文，系统自动保存（Ctrl+S 手动保存）。
-
-### 术语表格式 (Glossary)
-
-请使用标准的 CSV 格式，包含两列：**原文** 和 **译文**。
-
-| 原文 (Source) | 译文 (Target) |
-| :--- | :--- |
-| Server | 服务器 |
-| Client | 客户端 |
-
-**注意**：
-*   文件编码必须为 **UTF-8**。
-*   原文列不能有重复值。
-*   无空行。
-
----
-
-## ⚙️ 进阶配置
-
-### 环境变量详解 (`data/.env`)
+### 环境变量（`data/.env`）
 
 | 变量名 | 说明 | 默认值 |
 | :--- | :--- | :--- |
-| `API_KEY` | LLM API 密钥 | (必填) |
-| `BASE_URL` | API 基础地址 | `https://api.moonshot.cn/v1` |
-| `MODEL` | 模型名称 | `kimi-k2-turbo-preview` |
-| `Currency_Limit` | 并发请求限制 | `5` |
-| `OLLAMA_BASE_URL` | 本地 Ollama 地址 | (可选) |
-| `OLLAMA_MODEL` | 本地 Ollama 模型 | (可选) |
+| `KIMI_API_KEY` / `KIMI_BASE_URL` / `KIMI_MODEL` | Kimi 配置 | base_url 默认 `https://api.moonshot.cn/v1`，model 默认 `kimi-k2-turbo-preview` |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `GPT_MODEL` | OpenAI 配置 | `https://api.openai.com/v1` / `gpt-realtime` |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` / `DEEPSEEK_MODEL` | DeepSeek 配置 | — / `deepseek-chat` |
+| `SILICON_API_KEY` / `SILICON_JSON_URL` / `SILICON_JSON_MODEL` | 硅基流动配置 | — / — |
+| `GEMINI_API_KEY` / `GEMINI_BASE_URL` / `GEMINI_MODEL` | Gemini 配置 | — / `gemini-2.5-flash` |
+| `DOUBAO_API_KEY` / `DOUBAO_BASE_URL` / `DOUBAO_MODEL` | 豆包配置 | — / `doubao-seed-1-6-251015` |
+| `SYSTEM_PROMPT` | 系统提示词（两步翻译流程 + JSON 输出契约） | 必填，见 `.env.example` |
+| `BASE_PROMPT` | 用户提示补充（术语/JSON 约束） | 必填，见 `.env.example` |
+| `Requests_Per_Minute` | 每分钟请求数上限（0 或负值 = 不限流） | `10` |
+| `Currency_Limit` | 并发 Worker 上限（实际取 min(该值, RPM)） | `6` |
+| `MAX_RETRIES` | 连续失败熔断阈值 | `3` |
+| `PRESERVE_STRUCTURE` | 是否启用结构化模式 | `true` |
+| `MAX_CHUNK_SIZE` | 单个分段最大长度 | `4000` |
+| `STRUCTURED_OUTPUT` | 是否按结构化 JSON 解析模型输出 | `true` |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | 历史预留项：当前版本**未实现** Ollama 接入 | — |
 
-### 本地模型支持 (Ollama)
+### Provider 说明
 
-支持接入 Ollama 运行本地模型（如 Llama 3, Qwen 等）：
-
-1.  确保 Ollama 服务已启动。
-2.  修改 `.env`：
-    ```ini
-    OLLAMA_BASE_URL=http://localhost:11434/v1
-    OLLAMA_MODEL=llama3
-    ```
+实际实现的 Provider（见 `modules/api_tool.py`）：`kimi`、`gpt`、`deepseek`、`silicon`、`gemini`、`doubao`。其中 Gemini 与 Doubao 使用各家 SDK 的结构化输出，实现较新、尚未充分验证；Ollama 接入当前未实现。
 
 ### 翻译模式
 
-- **结构化模式**：针对原生 Markdown，识别 H1-H6 标题结构，按章节智能切分（推荐）。
-- **非结构化模式**：针对转换后的文档（如 PDF 转 MD），不依赖标题结构，按段落流式处理。
+- **结构化模式**：识别 H1–H6 标题并按章节切分，适合原生 Markdown（推荐）；
+- **非结构化模式**：不依赖标题、按段落流式处理，适合 PDF/Word 等转换后的文档。
 
----
+## 项目结构
 
-## 🏗️ 项目结构
-
-```
+```text
 project_root/
-├── data/               # 配置文件与环境变量
-├── modules/            # 核心业务模块 (翻译引擎, 术语管理, IO工具)
-├── services/           # 全局服务 (诊断, 状态管理)
-├── templates/          # WebUI 模板
-├── static/             # WebUI 静态资源
-├── main.py             # CLI 入口
-└── app.py              # WebUI 入口
+├── data/                    # 配置（.env.example 入库；.env 不入库）
+├── modules/                 # 业务模块
+│   ├── api_tool.py          # LLMService：Provider 适配、prompt、结构化解析/JSON 修复、术语复写
+│   ├── translation_core.py  # 统一翻译核心：术语匹配 → prompt → 重试/修复 → 一致性 → 结果封装
+│   ├── read_tool.py         # 结构化分段、跨页断句合并、图片跳过
+│   ├── write_out_tool.py    # 蓝图 JSON + 增量日志 → 最终 Markdown
+│   ├── log_manager.py       # JSONL 增量日志（断点续传 / 预览）
+│   ├── csv_process_tool.py  # AC 自动机术语匹配、CSV/XLSX 校验
+│   ├── terminology_tool.py  # 词表加载 / 合并 / 保存
+│   ├── export_tool.py       # DOCX/PDF/EPUB/XLSX 导出
+│   ├── markitdown_tool.py   # 非 Markdown → Markdown 转换
+│   ├── count_tool.py        # 段落 / 字数统计
+│   └── config.py            # 全局配置（env）
+├── services/diagnostics.py  # 异步 API 诊断与全局错误态
+├── templates/ static/       # WebUI（FastAPI + Jinja + 原生 JS）
+├── scripts/                 # 安装 / 导出预览 / 检查脚本
+├── tests/                   # pytest（当前基线 94 passed / 5 skipped）
+├── reviews/                 # 历史 AI 审查报告（2025-11 ~ 2025-12）
+├── main.py                  # CLI 入口
+├── app.py                   # WebUI 入口
+├── baseline.py              # 无术语注入基线脚本（评测用；路径为示例，需按需修改）
+├── pyproject.toml           # 依赖与脚本入口（uv.lock / requirements.txt 同步维护）
+└── devdiary.md / CHANGELOG.md
 ```
 
-## 📬 联系方式
+## 测试
 
-如有问题或建议，欢迎提交 Issue 或联系：chasen0315@gmail.com
+```bash
+uv run python -m pytest -q    # 当前：94 passed, 5 skipped
+```
 
----
+- 需要各 Provider API Key 的测试在缺 Key 时自动 skip；
+- 覆盖范围：翻译核心（重试 / JSON 修复 / 术语复写 / 降级）、并发流程、读取与跨页合并、增量日志写出、词表匹配、导出、CLI 偏好等；
+- 暂无 CI：后续将加入 GitHub Actions 在 PR 上运行 pytest。
 
-<p align="center">Made with ❤️ for documentation.</p>
+## 路线图
+
+### 下一迭代（已排期）
+
+- **可复现的术语评测**（[issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)）：3 份文档（技术文档 / 规则书 / 小说）+ 配套词表与人工标注；A 组无词表基线 vs B 组整表 RAG 注入 vs C 组本项目分段词表注入；指标 = 术语命中率（主）、额外 token 开销、耗时，每组每文档 ≥2 次取均值并保留原始计数；结论用于复核仓库描述与本文档中的早期数字。
+
+### 后续
+
+- 稳定性：异步 RPM 限流器、非 JSON 模式的未翻译部分兜底、跨页断句信号扩展、图片回填策略化、写出上下文重构、大文档分批处理；
+- 工程：GitHub Actions + pytest CI；清理 tracked `__pycache__` / `egg-info` / 本地内部文档；
+- 文档：评测结论出来后统一修订对外数字与 README。
+
+## 已知限制
+
+- 术语能力依赖给定的词表，**不做自动术语识别**（NER 能力已于 2025-12-27 移除）；
+- 「+35% 识别率 / 节省 99% token」为早期小样本实验结论，目前无法复现，等待评测复核；
+- 当前未实现 Ollama 接入；
+- 导出排版基于 Markdown 结构，复杂版式（表格、公式、图片位置）能力有限；PDF 中文字体依赖运行环境；
+- 大文件的内存占用与限流仍需优化，WebUI 建议 ≤10MB；
+- 面向本机单用户使用，不含多用户鉴权与云端部署方案。
+
+## 联系与许可
+
+- 问题与建议：欢迎提交 Issue；
+- 邮箱：chasen0315@gmail.com；
+- License：[MIT](./LICENSE)
