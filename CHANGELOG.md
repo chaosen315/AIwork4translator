@@ -1,5 +1,15 @@
 # 更新日志 (Changelog)
 
+## 2026/06/14
+
+### 🛡️ 翻译稳健性与可观测性
+- **段落级重试与失败清单**：单段失败重新入队，达到 `PARAGRAPH_MAX_RETRIES`（回退 `MAX_RETRIES`）后写入 `failed_segments`；最终 Markdown 顶部输出 `> [!WARNING]` 摘要，`_intermediate.json` 回写 `translation_status=partial`、`completed_paragraphs`、`total_paragraphs`。
+- **坏 JSON 多层恢复与保守解析**：标准解析失败后依次尝试去代码围栏、平衡 JSON 抽取与 JSON 修复；仍失败时优先提取译文正文，允许 `new_terms`/`notes` 缺失。
+- **定向 fallback**：识别表格、HTML 块、代码围栏、容器块、嵌套列表等内容风险，以及 Kimi/Gemini/Doubao 的结构化失败特征，切换更保守的 Prompt。
+- **稳健分段**：表格、代码围栏、HTML 块、`:::` 容器与图片作为受保护块整体成块；超长时按结构边界拆分并重复包裹行，减少半截结构进入翻译链路。
+- **轻量评测器**：新增 `evaluate.py` 两组配置对比、`--safe-degrade off|auto|on`、`--bootstrap-from-seed` 显式建立最小基线集，报告包含质量代理、结构保持、术语一致性、重复相似度与 `prefix_hash` 复用指标。
+- **WebUI**：修复翻译链路缺少 `import json` 导致的 `NameError`；失败段写入 WARNING 摘要，响应结构新增 `translation_status` 与 `failed_segments`。
+
 ## 2026/03/14
 
 ### 🚀 写入性能与预览体验跃升
