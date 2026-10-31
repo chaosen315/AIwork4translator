@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, UploadFile
@@ -163,7 +164,8 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
     preservestructure = PS
     log_action("配置参数", f"preservestructure = {preservestructure}, PS = {PS}")
     CHUNK_SIZE = global_config.max_chunk_size
-    log_action("配置参数", f"CHUNK_SIZE = {CHUNK_SIZE}")
+    API_RETRY_LIMIT = max(int(os.getenv('MAX_RETRIES', '3')), 1)
+    log_action("配置参数", f"CHUNK_SIZE = {CHUNK_SIZE}, API_RETRY_LIMIT = {API_RETRY_LIMIT}")
     input_dir = os.path.dirname(input_md_file)
     input_filename = os.path.basename(input_md_file)
     base_name, extension = os.path.splitext(input_filename)
@@ -176,7 +178,25 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
     
     # 简单的聚合新术语字典（WebUI 目前没有持久化这些，但可以用于复写）
     aggregated_new_terms = {} 
-    
+    failed_segments = []
+
+    def _build_failure_info(segment_info, error, prefix=""):
+        meta = segment_info.get("meta_data") or {}
+        header_path = meta.get("header_path", []) if isinstance(meta, dict) else []
+        raw_content = " ".join(str(segment_info.get("content", "")).split())
+        if len(raw_content) > 120:
+            raw_content = f"{raw_content[:117]}..."
+        error_summary = " ".join(str(error or "未知错误").split())
+        if len(error_summary) > 160:
+            error_summary = f"{error_summary[:157]}..."
+        return {
+            "paragraph_number": segment_info.get("paragraph_number"),
+            "retry_count": 0,
+            "error_summary": f"{prefix}{error_summary}".strip(),
+            "header_path": header_path,
+            "content_preview": raw_content,
+        }
+
     counter = 1
     while os.path.exists(output_md_file):
         log_action("输出文件已存在", f"文件: {output_md_file}，添加编号后缀")
@@ -253,7 +273,8 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
                 segment_data, 
                 terms_dict, 
                 aggregated_new_terms,
-                terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT
+                terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT,
+                max_api_retries=API_RETRY_LIMIT
             )
             
             if not result.success:
@@ -301,6 +322,7 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
             if task_id in translation_tasks:
                 translation_tasks[task_id]["status"] = "error"
                 translation_tasks[task_id]["error"] = error_msg
+            failed_segments.append(_build_failure_info(segment_data, error_msg))
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 log_action("连续失败阈值触发", f"连续{MAX_CONSECUTIVE_FAILURES}次失败，开始API测试")
                 # 调用同步的 test_api，这里需要 to_thread 吗？
@@ -308,11 +330,35 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
                 test_results = await asyncio.to_thread(llm_service.test_api)
                 
                 log_action("API测试完成", f"测试结果: {test_results}")
+                for remaining in paragraphs[idx + 1:]:
+                    if isinstance(remaining, dict):
+                        remaining_info = {
+                            "content": remaining.get("content", ""),
+                            "meta_data": remaining.get("meta_data"),
+                            "paragraph_number": remaining.get("paragraph_number"),
+                        }
+                    else:
+                        remaining_info = {"content": remaining, "paragraph_number": None}
+                    failed_segments.append(
+                        _build_failure_info(remaining_info, "连续失败中断，该段未处理", prefix="任务中断：")
+                    )
+
+                if task_id in translation_tasks:
+                    translation_tasks[task_id]["status"] = "finalizing"
+                await asyncio.to_thread(
+                    finalize_translation_output,
+                    json_path,
+                    output_md_file,
+                    'structured' if preservestructure else 'flat',
+                    failed_segments,
+                )
                 return {
                     "status": "error",
                     "message": f"连续{MAX_CONSECUTIVE_FAILURES}次翻译失败，已触发API测试",
                     "error": last_error,
-                    "test_results": test_results
+                    "test_results": test_results,
+                    "output_file": output_md_file,
+                    "failed_segments": failed_segments,
                 }
     
     # Finalize Output
@@ -321,15 +367,19 @@ async def process_files(input_md_file: str, csv_file: str, llm_provider: str) ->
     
     log_action("文件处理完成", "正在生成最终文件...")
     mode = 'structured' if preservestructure else 'flat'
-    await asyncio.to_thread(finalize_translation_output, json_path, output_md_file, mode)
-    
+    await asyncio.to_thread(finalize_translation_output, json_path, output_md_file, mode, failed_segments)
+
     if task_id in translation_tasks:
         translation_tasks[task_id]["status"] = "completed"
+        translation_tasks[task_id]["failed_count"] = len(failed_segments)
+        translation_tasks[task_id]["translation_status"] = "partial" if failed_segments else "completed"
         
     log_action("文件生成完毕", f"成功生成输出文件: {output_md_file}")
     return {
         "status": "success",
-        "output_file": output_md_file
+        "output_file": output_md_file,
+        "translation_status": "partial" if failed_segments else "completed",
+        "failed_segments": failed_segments,
     }
 
 from fastapi.responses import RedirectResponse
