@@ -1,0 +1,9 @@
+{
+  "name": "experiment",
+  "provider": "kimi",
+  "preserve_structure": true,
+  "safe_degrade_mode": "auto",
+  "env_overrides": {
+    "BASE_PROMPT": "在完成翻译主职基础上，优先稳定术语和 Markdown 结构，严格只返回 JSON。"
+  }
+}

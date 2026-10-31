@@ -1,0 +1,7 @@
+{
+  "name": "baseline",
+  "provider": "kimi",
+  "preserve_structure": false,
+  "safe_degrade_mode": "auto",
+  "env_overrides": {}
+}

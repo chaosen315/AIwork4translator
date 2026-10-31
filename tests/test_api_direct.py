@@ -2,8 +2,16 @@ import os
 import traceback
 from modules.api_tool import KimiProvider, DeepseekProvider, SiliconProvider, GeminiProvider, DoubaoProvider
 from dotenv import load_dotenv
+import pytest
 
 load_dotenv("data/.env")
+
+# 这是脚本式真机冒烟，不是 pytest 用例：pytest 导入模块时会执行模块级代码（真实调用 5 家 API）。
+# 需要跑真机冒烟时直接执行：python tests/test_api_direct.py
+pytest.skip(
+    "script-style live API smoke test; run `python tests/test_api_direct.py` explicitly",
+    allow_module_level=True,
+)
 # 打印环境变量状态
 def print_env_status():
     print("=== 环境变量状态 ===")

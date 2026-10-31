@@ -26,13 +26,14 @@ def test_append_and_replay(blueprint_file):
     manager = TranslationLogManager(blueprint_file)
     
     # Append
-    manager.append_log(1, {"translation": "t1"})
+    manager.append_log(1, {"translation": "t1", "request_metadata": {"request_id": "kimi-1", "prefix_hash": "hash-1"}})
     manager.append_log(3, {"translation": "t3"})
     
     # Replay
     updates = manager.replay_logs()
     assert len(updates) == 2
     assert updates[1]["translation"] == "t1"
+    assert updates[1]["request_metadata"]["prefix_hash"] == "hash-1"
     assert updates[3]["translation"] == "t3"
     assert 2 not in updates
 

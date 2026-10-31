@@ -4,7 +4,10 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 .DS_Store
+current_env.txt
+dashboard_analysis.ipynb
 
 # Secrets and environment
 # Ignore all data contents by default, except README and .env.example

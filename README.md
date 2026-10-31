@@ -11,16 +11,16 @@ AIwork4translator 是一个面向专业文档的 AI 翻译工具，适合技术�
 
 ---
 
-## 最新更新（2026/03/14）
+## 最新更新（2026/06/14）
 
-- **蓝图 + 增量日志写入架构**：翻译过程中只追加 JSONL 日志，结束时一次性合并生成 Markdown，显著降低长文档后期的 IO 延迟；
-- **毫秒级预览**：WebUI 预览改为从内存/日志聚合，不再依赖磁盘文件读取；
-- **原子化写入**：最终 Markdown 在任务结束时一次性生成，减少文件锁冲突；
-- **多格式导出**：基于 `_intermediate.json` 导出 DOCX / PDF / EPUB / XLSX，并提供 `scripts/preview_export_outputs.py` 结构预览脚本；
-- **Provider 异步接口**：所有 LLM Provider 增加异步调用，改善 Ctrl+C 中断响应；
-- **术语表全信息字典**：支持 `term/translation/reason` 结构并优化写入性能。
+- **段落级重试与失败清单**：单段失败按 `PARAGRAPH_MAX_RETRIES`（未设置时回退 `MAX_RETRIES`）重新入队；超限后写入 `failed_segments`，最终 Markdown 顶部输出 `> [!WARNING]` 摘要，`_intermediate.json` 回写 `translation_status=partial` 与完成段计数；
+- **坏 JSON 多层恢复**：解析链路改为「标准解析 → 去代码围栏 → 平衡 JSON 抽取 → JSON 修复 → 保守字段恢复」，优先保住译文正文；
+- **定向 fallback**：按内容风险（表格 / HTML / 代码围栏 / 容器块 / 嵌套列表）与 Provider 失败特征切换更保守的 Prompt；
+- **稳健分段**：表格、代码围栏、HTML 块、`:::` 容器与图片按受保护块整体成块，超长时按结构拆分并重复包裹行；
+- **轻量评测器**：`evaluate.py` 支持两组配置对比、`--safe-degrade off|auto|on`、`--bootstrap-from-seed` 显式建立最小基线集，报告含质量代理、结构保持、术语一致性、重复相似度与 `prefix_hash` 复用指标；
+- **WebUI 修复**：修复 WebUI 翻译链路缺少 `import json` 导致的 `NameError`，失败段现在也会写入 WARNING 摘要。
 
-完整历史见 [CHANGELOG.md](./CHANGELOG.md)。
+2026/03/14 的蓝图 + 增量日志、异步 Provider 与多格式导出见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 核心特性
 

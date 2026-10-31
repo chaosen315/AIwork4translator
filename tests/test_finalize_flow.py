@@ -37,13 +37,17 @@ def test_finalize_flow(blueprint_file, tmp_path):
         "translation": "Translated 1", 
         "notes": "Note 1",
         "new_terms": [],
-        "matched_terms": []
+        "matched_terms": [],
+        "request_metadata": {"request_id": "kimi-1", "prefix_hash": "hash-1", "structured": True},
+        "prefix_hash": "hash-1",
     })
     manager.append_log(2, {
         "translation": "Translated 2", 
         "notes": "",
         "new_terms": [],
-        "matched_terms": []
+        "matched_terms": [],
+        "request_metadata": {"request_id": "kimi-2", "prefix_hash": "hash-2", "structured": True},
+        "prefix_hash": "hash-2",
     })
     
     # 2. Call finalize
@@ -68,10 +72,16 @@ def test_finalize_flow(blueprint_file, tmp_path):
     assert p1['status'] == 'completed'
     assert p1['translation'] == "Translated 1"
     assert p1['notes'] == "Note 1"
+    assert p1['request_metadata']['request_id'] == "kimi-1"
+    assert p1['prefix_hash'] == "hash-1"
     
     p2 = data['text_info'][1]
     assert p2['status'] == 'completed'
     assert p2['translation'] == "Translated 2"
+    assert p2['request_metadata']['prefix_hash'] == "hash-2"
+    assert data['translation_status'] == 'completed'
+    assert data['failed_segments'] == []
+    assert data['completed_paragraphs'] == 2
 
 def test_finalize_clears_md_before_writing(blueprint_file, tmp_path):
     md_path = tmp_path / "existing.md"

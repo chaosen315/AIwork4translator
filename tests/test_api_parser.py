@@ -30,6 +30,22 @@ def test_parse_partial_json_in_text():
     }, ensure_ascii=False)
     text = "前缀\n" + json_block + "\n后缀"
     result = parse_translation_response(text)
+    assert result["translation"].replace(" ", "") == "中文"
+    assert result["new_terms"] == []
+
+def test_parse_json_code_fence():
+    payload = {
+        "translation": "保留正文",
+        "new_terms": [],
+    }
+    text = "```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```"
+    result = parse_translation_response(text)
+    assert result["translation"] == "保留正文"
+    assert result["new_terms"] == []
+
+def test_parse_truncated_json_returns_repairable_error():
+    text = '{"translation": "正文仍可见", "new_terms": ['
+    result = parse_translation_response(text)
     assert result.get("error") == "Invalid JSON format"
     assert result.get("origin_text") == text
 
