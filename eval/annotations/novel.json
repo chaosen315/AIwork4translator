@@ -1,0 +1,164 @@
+{
+  "doc": "novel",
+  "document": "documents/novel.md",
+  "glossary": "glossaries/novel.csv",
+  "source_language": "en",
+  "target_language": "zh",
+  "matching": "case-insensitive whole phrase; generated anchors only",
+  "term_count": 30,
+  "glossary_size": 1200,
+  "document_words": 2141,
+  "total_occurrences": 134,
+  "terms": [
+    {
+      "term": "Marin Voss",
+      "translation": "马林·沃斯",
+      "occurrences": 4
+    },
+    {
+      "term": "the Saltglass Sea",
+      "translation": "盐玻璃海",
+      "occurrences": 4
+    },
+    {
+      "term": "Lumen Reef",
+      "translation": "流明礁",
+      "occurrences": 5
+    },
+    {
+      "term": "the Quiet Tide",
+      "translation": "静潮",
+      "occurrences": 5
+    },
+    {
+      "term": "Ashen Harbor",
+      "translation": "灰港",
+      "occurrences": 5
+    },
+    {
+      "term": "Kestrel",
+      "translation": "凯斯特雷尔",
+      "occurrences": 5
+    },
+    {
+      "term": "the Concordat",
+      "translation": "协定",
+      "occurrences": 5
+    },
+    {
+      "term": "Tidewright",
+      "translation": "潮汐编织者",
+      "occurrences": 4
+    },
+    {
+      "term": "beacon lattice",
+      "translation": "信标阵",
+      "occurrences": 4
+    },
+    {
+      "term": "star compass",
+      "translation": "星盘罗经",
+      "occurrences": 4
+    },
+    {
+      "term": "the Drowned Bell",
+      "translation": "沉钟",
+      "occurrences": 4
+    },
+    {
+      "term": "Mirelle",
+      "translation": "米雷尔",
+      "occurrences": 4
+    },
+    {
+      "term": "obsidian buoy",
+      "translation": "黑曜浮标",
+      "occurrences": 5
+    },
+    {
+      "term": "the Echo Current",
+      "translation": "回声洋流",
+      "occurrences": 4
+    },
+    {
+      "term": "cartographer",
+      "translation": "制图师",
+      "occurrences": 6
+    },
+    {
+      "term": "salt script",
+      "translation": "盐文",
+      "occurrences": 4
+    },
+    {
+      "term": "lantern gull",
+      "translation": "灯鸥",
+      "occurrences": 5
+    },
+    {
+      "term": "the Widow's Reach",
+      "translation": "寡妇岬",
+      "occurrences": 4
+    },
+    {
+      "term": "brineglass",
+      "translation": "卤玻璃",
+      "occurrences": 5
+    },
+    {
+      "term": "the Ninth Chart",
+      "translation": "第九海图",
+      "occurrences": 5
+    },
+    {
+      "term": "harbor warden",
+      "translation": "港务官",
+      "occurrences": 5
+    },
+    {
+      "term": "tide ledger",
+      "translation": "潮汐账簿",
+      "occurrences": 4
+    },
+    {
+      "term": "the Broken Meridian",
+      "translation": "破碎子午线",
+      "occurrences": 4
+    },
+    {
+      "term": "glasswing",
+      "translation": "玻璃翼",
+      "occurrences": 4
+    },
+    {
+      "term": "the Sable Fleet",
+      "translation": "黑貂舰队",
+      "occurrences": 5
+    },
+    {
+      "term": "quiet water",
+      "translation": "静水",
+      "occurrences": 4
+    },
+    {
+      "term": "keel song",
+      "translation": "龙骨之歌",
+      "occurrences": 5
+    },
+    {
+      "term": "the Lantern Coast",
+      "translation": "提灯海岸",
+      "occurrences": 4
+    },
+    {
+      "term": "drift marker",
+      "translation": "漂流标记",
+      "occurrences": 4
+    },
+    {
+      "term": "the Returning",
+      "translation": "归返",
+      "occurrences": 4
+    }
+  ]
+}
