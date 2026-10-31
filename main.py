@@ -193,8 +193,27 @@ def get_user_config() -> UserConfig:
 async def run_translation_loop(paragraphs, translation_core: TranslationCore, terms_dict, aggregated_new_terms, output_md_file, PS, json_path=None):
     # Ensure paragraphs are sorted
     paragraphs.sort(key=lambda x: x['paragraph_number'] if isinstance(x, dict) and 'paragraph_number' in x else 0)
+
+    def build_failed_segment_info(segment: Dict[str, Any], error: Optional[str], retry_count: int) -> Dict[str, Any]:
+        meta_data = segment.get('meta_data') or {}
+        header_path = meta_data.get('header_path', []) if isinstance(meta_data, dict) else []
+        raw_content = " ".join(str(segment.get('content', '')).split())
+        if len(raw_content) > 120:
+            raw_content = f"{raw_content[:117]}..."
+
+        error_summary = " ".join(str(error or "未知错误").split())
+        if len(error_summary) > 160:
+            error_summary = f"{error_summary[:157]}..."
+
+        return {
+            'paragraph_number': segment.get('paragraph_number'),
+            'retry_count': retry_count,
+            'error_summary': error_summary,
+            'header_path': header_path,
+            'content_preview': raw_content,
+        }
     
-    # 1. Replay logs and filter completed tasks
+    # 1. Replay logs and restore already completed paragraphs before queueing the rest.
     if json_path:
         log_manager = TranslationLogManager(json_path)
         updates = await asyncio.to_thread(log_manager.replay_logs)
@@ -228,13 +247,16 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
         if k:
             aggregated_new_terms_dict[k] = nt
     
+    paragraph_retry_limit = int(os.getenv('PARAGRAPH_MAX_RETRIES', os.getenv('MAX_RETRIES', 3)))
+    api_retry_limit = max(int(os.getenv('MAX_RETRIES', '3')), 1)
     consecutive_failures = 0
+    failed_segments: List[Dict[str, Any]] = []
     
     async def worker(worker_id):
         nonlocal consecutive_failures
         print(f"[System] Worker-{worker_id} 启动")
         while True:
-            # 检查全局错误状态或连续失败次数
+            # 全局熔断仍然存在，但单段失败会优先走段落级重试，而不是立即丢弃。
             is_err, _ = global_diagnostics.get_global_error_state()
             if is_err or consecutive_failures >= int(os.getenv('MAX_RETRIES', 3)) + 2:
                 if not is_err:
@@ -252,28 +274,45 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
                 p_id = segment.get('paragraph_number', '?') if isinstance(segment, dict) else '?'
                 print(f"[System] Worker-{worker_id} 取出段落 {p_id} (队列剩余: {queue.qsize()})")
                 
-                # 调用核心
+                # 核心层会先尝试常规结构化翻译，再按需走坏 JSON 修复和定向 fallback。
                 result = await translation_core.execute_translation_step(
                     segment, terms_dict, aggregated_new_terms_dict, 
                     tracker_state=tracker_state,
-                    terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT
+                    terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT,
+                    max_api_retries=api_retry_limit
                 )
                 
                 if not result.success:
                     consecutive_failures += 1
-                    print(f"[System] Worker-{worker_id} 段落 {p_id} 失败: {result.error}")
-                    # 触发诊断
-                    asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
-                    # 注意：这里不要调用 queue.task_done()，统一由 finally 处理
+                    retry_count = int(segment.get('_paragraph_retry_count', 0)) + 1
+                    segment['_paragraph_retry_count'] = retry_count
+                    segment['last_error'] = result.error
+                    print(f"[System] Worker-{worker_id} 段落 {p_id} 失败(段落级重试 {retry_count}/{paragraph_retry_limit}): {result.error}")
+
+                    if retry_count <= paragraph_retry_limit:
+                        queue.put_nowait(segment)
+                        print(f"[System] Worker-{worker_id} 已将段落 {p_id} 重新入队")
+                    else:
+                        failure_info = build_failed_segment_info(segment, result.error, retry_count)
+                        segment['status'] = 'failed'
+                        segment['failure_info'] = failure_info
+                        failed_segments.append(failure_info)
+                        print(f"[System] Worker-{worker_id} 段落 {p_id} 达到段落级重试上限，加入失败清单。")
+                        asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
+
+                    # 注意：这里不要调用 queue.task_done()，统一由 finally 处理。
                     continue
 
                 # 成功则重置连续失败计数
                 consecutive_failures = 0
                 stats['total_tokens'] += result.tokens
+                segment['status'] = 'completed'
+                segment.pop('_paragraph_retry_count', None)
+                segment.pop('last_error', None)
                 
                 
                 
-                # 写入
+                # 写入阶段只追加日志；最终 Markdown 与失败摘要统一在 finalize 阶段生成。
                 async with file_lock:
                     aggregated_new_terms.extend(result.new_terms_delta)
                     for nt in result.new_terms_delta:
@@ -288,24 +327,39 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
                     
                     mode = 'structured' if PS else 'flat'
                     if json_path and tracker_state:
+                        request_metadata = dict(result.request_metadata or {})
                         content_info = {
                             'translation': result.content,
                             'notes': result.notes,
                             'new_terms': result.new_terms_delta,
-                            'matched_terms': result.matched_terms_delta # Added missing field
+                            'matched_terms': result.matched_terms_delta,
+                            'request_metadata': request_metadata,
+                            'prefix_hash': request_metadata.get('prefix_hash', ''),
                         }
-                        # Use updated logic: just append log, no MD writing here
                         await asyncio.to_thread(write_to_markdown_through_json, json_path, output_md_file, p_id, content_info, tracker_state, mode) # type: ignore
                     else:
-                        # Fallback for non-JSON mode (still direct write)
+                        # 非 JSON 模式仍保留直接写 Markdown 的兼容路径。
                         await asyncio.to_thread(write_to_markdown, output_md_file, (response_text, segment.get('meta_data')), mode) # type: ignore
                 
                 print(f"[System] Worker-{worker_id} 完成段落 {p_id}")
 
             except Exception as e:
                 consecutive_failures += 1
-                print(f"[System] Error in Worker-{worker_id} processing segment: {e}")
-                asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
+                retry_count = int(segment.get('_paragraph_retry_count', 0)) + 1
+                segment['_paragraph_retry_count'] = retry_count
+                segment['last_error'] = str(e)
+                print(f"[System] Error in Worker-{worker_id} processing segment {p_id}: {e}")
+
+                if retry_count <= paragraph_retry_limit:
+                    queue.put_nowait(segment)
+                    print(f"[System] Worker-{worker_id} 已将异常段落 {p_id} 重新入队")
+                else:
+                    failure_info = build_failed_segment_info(segment, str(e), retry_count)
+                    segment['status'] = 'failed'
+                    segment['failure_info'] = failure_info
+                    failed_segments.append(failure_info)
+                    print(f"[System] Worker-{worker_id} 段落 {p_id} 因异常达到段落级重试上限，加入失败清单。")
+                    asyncio.create_task(safe_api_diagnostics(translation_core.llm_service))
             finally:
                 queue.task_done()
 
@@ -314,20 +368,42 @@ async def run_translation_loop(paragraphs, translation_core: TranslationCore, te
     workers = [asyncio.create_task(worker(i+1)) for i in range(concurrency_limit)]
     await asyncio.gather(*workers)
 
-    # 熔断后尝试保存未翻译部分 (Log based recovery makes this less critical but kept for non-JSON mode)
+    # 熔断或异常退出后，队列里未处理的段落也必须进入失败清单：
+    # 否则成品会“看起来完成”，而实际上有段落既没进正文也没进 failed_segments。
+    while True:
+        try:
+            leftover = queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        else:
+            failure_info = build_failed_segment_info(
+                leftover, "任务熔断/中断，该段未处理", 0
+            )
+            leftover['status'] = 'failed'
+            leftover['failure_info'] = failure_info
+            failed_segments.append(failure_info)
+            queue.task_done()
+
+    # 熔断后不再额外保存“未翻译部分”文件；JSON 蓝图、日志和失败清单已经足够支撑恢复与排查。
     is_err, _ = global_diagnostics.get_global_error_state()
     if is_err:
         print("[System] 任务因熔断停止。")
-        # Logic to save rest.md could reuse finalize if implemented, but here we just stop.
-        # Log is already saved.
     
-    # Finalize Output
-    if json_path and not is_err: # Only finalize if no global error? Or always?
-        # User might want partial result. Let's finalize even if error, so we get what we have.
+    # Finalize 阶段统一落盘 Markdown、失败段摘要和 JSON 状态。
+    if json_path:
         print("[System] 正在生成最终 Markdown 文件...")
         mode = 'structured' if PS else 'flat'
-        await asyncio.to_thread(finalize_translation_output, json_path, output_md_file, mode)
+        await asyncio.to_thread(
+            finalize_translation_output,
+            json_path,
+            output_md_file,
+            mode,
+            failed_segments,
+        )
         print(f"[System] 最终文件生成完毕: {output_md_file}")
+        if failed_segments:
+            failed_ids = ", ".join(str(item.get('paragraph_number')) for item in failed_segments)
+            print(f"[System] 翻译部分完成。失败段落清单: {failed_ids}")
 
     return stats['total_tokens']
 
@@ -410,7 +486,8 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
                     segment_data, 
                     terms_dict, 
                     persistent_new_terms_dict,
-                    terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT
+                    terminology_policy=TerminologyPolicy.MERGE_ON_CONFLICT,
+                    max_api_retries=max(int(os.getenv('MAX_RETRIES', '3')), 1)
                 ))
                 
                 if not result.success:
@@ -435,6 +512,8 @@ def run_sync_translation_loop(config: UserConfig, translation_core: TranslationC
                     'notes': result.notes,
                     'new_terms': result.new_terms_delta,
                     'matched_terms': result.matched_terms_delta,
+                    'request_metadata': dict(result.request_metadata or {}),
+                    'prefix_hash': (result.request_metadata or {}).get('prefix_hash', ''),
                     'status': 'completed'
                 })
                 

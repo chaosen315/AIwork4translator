@@ -11,16 +11,16 @@ AIwork4translator is an AI translation tool for professional documents — techn
 
 ---
 
-## Latest Update (2026/03/14)
+## Latest Update (2026/06/14)
 
-- **Blueprint + append-only log write architecture**: during translation only JSONL logs are appended; the final Markdown is assembled once at the end, greatly reducing late-stage I/O latency on long documents.
-- **Millisecond-level preview**: the WebUI preview now aggregates content from memory/logs instead of reading files from disk.
-- **Atomic final write**: the final Markdown file is generated in one atomic operation at the end of the task, avoiding file-lock contention.
-- **Multi-format export**: export DOCX / PDF / EPUB / XLSX from `_intermediate.json`, plus `scripts/preview_export_outputs.py` to preview the structure of exported files.
-- **Async Provider interfaces**: all LLM providers now expose async calls, improving Ctrl+C interrupt responsiveness.
-- **Full-info glossary dictionary**: terminology entries support `term/translation/reason`, with optimized write performance.
+- **Paragraph-level retry and failure list**: a failed paragraph is requeued up to `PARAGRAPH_MAX_RETRIES` (falling back to `MAX_RETRIES`); once the limit is reached it is recorded in `failed_segments`, the final Markdown starts with a `> [!WARNING]` summary, and `_intermediate.json` records `translation_status=partial` plus completion counters.
+- **Multi-layer bad-JSON recovery**: parsing now falls back through "strict parse → strip code fences → extract balanced JSON → JSON repair → conservative field recovery", keeping the translated body whenever possible.
+- **Targeted fallback**: high-risk content (tables, HTML blocks, code fences, container blocks, nested lists) and provider-specific failure patterns switch to a more conservative prompt.
+- **Robust segmentation**: tables, code fences, HTML blocks, `:::` containers and images are kept as protected blocks; oversized ones are split along structure boundaries with wrapper lines repeated.
+- **Lightweight evaluator**: `evaluate.py` compares two configurations, supports `--safe-degrade off|auto|on` and explicit `--bootstrap-from-seed`, and reports quality proxy, structure preservation, terminology consistency, repeat similarity and `prefix_hash` reuse.
+- **WebUI fix**: the WebUI translation path no longer fails with `NameError` caused by a missing `import json`; failed paragraphs now also produce the WARNING summary.
 
-See [CHANGELOG.md](./CHANGELOG.md) for the full history.
+Blueprint + append-only log, async providers and multi-format export from 2026/03/14 are documented in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Key Features
 

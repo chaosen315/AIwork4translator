@@ -12,6 +12,13 @@
 ## 开发时间线记录
 
 
+### 2026/06/14 - LLM Provider 缓存协议调研完成
+- **新增文件**：
+  - `.trae/documents/plan_llm_provider_cache_research.md`：调研计划
+  - `.trae/documents/LLM Provider 缓存协议调研报告_VER_A.md`：调研交付物（含 9 个 Provider 全景分析表 + 关键代码原型草案）
+- **覆盖范围**：业务已接入 7 个 Provider（Kimi / OpenAI / DeepSeek / SiliconFlow / Gemini / Doubao / Ollama）+ 高价值候选 2 个（Anthropic Claude、OpenAI gpt-5 / o-series）
+- **状态**：调研执行完成，待内部技术评审。**未修改任何源码与测试**。
+
 ### 2025/11/9 21:24:08 - MarkItDown工具优化（命令行版本）
 - **文件修改**：src/modules/markitdown_tool.py
 - **主要更新**：
@@ -243,3 +250,91 @@
 - **验证与结果**：
   - 测试：`uv run pytest -q tests/test_export.py` 通过。
   - 实测：对 `input_files/《赤红传说》112-127_intermediate.json` 导出 `docx/pdf/epub`，预览脚本可正确展示 DOCX 标题、EPUB 目录，且 PDF 中文文本抽取正常。
+
+### 2026/06/14 - 翻译稳健性增强、真实复跑验证与文档对齐
+- **背景**：真实长文档翻译中暴露出两个关键问题：一是单段失败后并发任务仍继续推进，但失败段可能被静默丢失；二是表格、HTML 块、代码围栏等高风险结构容易触发坏 JSON 或结构化输出不稳定。为显著提高成功率、可恢复性与可排查性，本次围绕段落级重试、稳健分段、保守解析与文档对齐进行集中更新。
+- **核心变更**：
+  - **段落级重试与失败清单补全**：
+    - 在 `main.py` 的并发翻译循环中补上“失败段重新入队 + 次数上限”机制。
+    - 达到 `PARAGRAPH_MAX_RETRIES` 后，不再静默跳过，而是写入 `failed_segments`，并在最终输出中标记为部分完成。
+    - 最终 Markdown 顶部新增 warning 摘要；`_intermediate.json` 回写 `failed_segments`、`translation_status`、`completed_paragraphs`、`total_paragraphs`。
+  - **坏 JSON 多层恢复与保守解析**：
+    - 在 `modules/api_tool.py` 中增强结构化解析，新增代码块解包、平衡 JSON 提取与更稳健的解析入口。
+    - 在 `modules/translation_core.py` 中增加坏 JSON 保守恢复逻辑，无法完整修复时优先提取 `translation/notes`，放弃不可靠的 `new_terms` 回写。
+  - **高风险内容定向 fallback**：
+    - 在 `modules/translation_core.py` 中加入对 Markdown 表格、HTML 块、代码围栏、容器块、嵌套列表等高风险内容的识别。
+    - 针对 `kimi`、`gemini`、`doubao` 等 Provider 的结构化失败特征，启用更保守的 fallback Prompt，优先保证正文与结构边界。
+  - **稳健分段与结构保护**：
+    - 在 `modules/read_tool.py` 中强化对表格、HTML 块、代码围栏、容器块、图片节点的边界识别。
+    - 通过“原子分段 + 受控合并”减少半截结构段进入翻译链路，提高复杂文档的整体成功率。
+  - **输出与恢复链路统一**：
+    - 在 `modules/write_out_tool.py` 中统一最终汇总流程，将失败摘要写入 Markdown，并把失败状态同步回蓝图 JSON。
+    - 延续 Blueprint + 增量日志模式，确保恢复、预览与最终落盘逻辑保持一致。
+- **真实复跑验证**：
+  - 基于真实保留的 `_intermediate.json` 与真实输入文件进行复跑验证，重点检查高风险段落与坏 JSON 场景。
+  - 验证结果表明：单段失败后不再被静默吞掉；高风险段会进入更保守路径；最终产物可以明确区分 `completed` 与 `partial`。
+  - 对真实失败现场的复盘进一步确认：当前版本比旧版本更适合长文档与复杂结构混合内容的稳定翻译。
+- **审查与文档对齐**：
+  - 对本轮代码更新与 `README.md` 的表述冲突进行了专项审查，重点检查 API 配置、失败恢复、`_intermediate.json` 用途与高风险结构说明。
+  - 更新 `README.md`，补充 Provider 专用环境变量说明，修正旧的统一 `API_KEY/BASE_URL/MODEL` 叙述。
+  - 新增“失败恢复与排查”“`_intermediate.json` 的作用与注意事项”“高风险结构与保守解析”等说明，确保文档与当前实现一致。
+- **相关文件**：
+  - `main.py`
+  - `modules/translation_core.py`
+  - `modules/api_tool.py`
+  - `modules/read_tool.py`
+  - `modules/write_out_tool.py`
+  - `README.md`
+  - `.trae/specs/improve-translation-resilience/spec.md`
+  - `.trae/specs/improve-translation-resilience/tasks.md`
+  - `.trae/specs/improve-translation-resilience/checklist.md`
+
+### 2026/06/14 - Task4/Task5：轻量评测闭环补齐与最小基线集
+- **背景**：上一版轻量评测在 `input_files/` 为空时会默认自动 bootstrap，和“默认安全退出、仅在用户显式授权时改写输入目录”的要求不一致；同时需要补上一份基于 `seed-dir` 的真实基线/实验对比报告，作为 Task 清单可勾选的交付物。
+- **核心变更**：
+  - 在 `modules/lightweight_evaluator.py` 调整最小基线集发现逻辑：`prepare_evaluation_samples()` / `discover_evaluation_samples()` 默认不再自动 bootstrap，空目录时改为安全退出并提示显式启用方式。
+  - 为 `EvaluationConfig` 与评测结果增加 `safe_degrade_mode`、`degraded`、`degraded_reason` 字段；`safe_degrade=on` 时直接走本地受控降级，不发真实 API 请求，`auto` 时则在真实调用失败后回退。
+  - 扩展 `evaluate.py` CLI 参数，新增显式开关 `--bootstrap-from-seed`，并要求与 `--seed-dir`（或默认 `test_prompts`）配合使用；未显式启用时不再偷偷建立最小基线集。
+  - 新增可直接运行的 `test_prompts/evaluate_baseline.json` 与 `test_prompts/evaluate_experiment.json`，作为默认基线/实验配置样例。
+  - 更新 `README.md` 与 `.trae/specs/improve-translation-resilience/*`，把评测器的默认安全退出、显式 bootstrap、报告产物与测试状态同步到文档和任务清单。
+- **验证与结果**：
+  - 自动化测试：`python -m pytest tests/test_lightweight_evaluator.py tests/test_api_prefix_hash.py -q` 通过（`10 passed`），新增覆盖“空目录默认安全退出”和“显式 bootstrap 后生成报告”。
+  - CLI 闭环验证：执行 `evaluate.main()` 并传入 `--input-dir output_files/seed_eval_input --bootstrap-from-seed --seed-dir test_prompts --baseline-config-file test_prompts/evaluate_baseline.json --experiment-config-file test_prompts/evaluate_experiment.json --safe-degrade on --output comparison_results.csv --details-json comparison_results.json`，确认空目录会先由 `seed-dir` 建立 `baseline_seed_test_samples.md/.csv`，随后成功落盘基线/实验对比报告。
+  - 报告摘要：`comparison_results.csv/json` 当前记录 1 个 seed 样本、2 次降级运行；基线与实验的质量代理、结构保持、术语一致性 delta 均为 `0.0`，实验平均耗时略低（`1.4632s` vs `1.8814s`）。
+- **已知限制**：
+  - `safe_degrade=on` 产出的译文是本地保守替代结果，主要用于验证评测流程、对比维度和文件产物是否正常，不代表真实翻译质量。
+  - 当前环境下 Provider 返回 `invalid temperature: only 1 is allowed for this model`，因此本次报告走了受控降级链路；若需要真正比较提示词工程改动对质量代理指标的影响，仍应在修正 Provider 参数后使用 `safe_degrade=auto` 或 `off` 复测。
+- **相关文件**：
+  - `modules/lightweight_evaluator.py`
+  - `evaluate.py`
+  - `tests/test_lightweight_evaluator.py`
+  - `tests/test_api_prefix_hash.py`
+  - `test_prompts/evaluate_baseline.json`
+  - `test_prompts/evaluate_experiment.json`
+  - `comparison_results.csv`
+  - `comparison_results.json`
+  - `output_files/seed_eval_input/`
+  - `README.md`
+
+### 2026/06/14 - add-prefix-context-caching 收尾：轻量评测报告补齐 prefix_hash 代理信号
+- **背景**：`modules/api_tool.py` 已经具备稳定前缀 `prefix_hash`，但轻量评测器只比较质量代理与稳定性指标，缺少对“前缀是否复用、实验提示词是否改变前缀族”的留痕，导致 `add-prefix-context-caching` 的任务清单仍无法闭环勾选。
+- **核心变更**：
+  - 在 `modules/lightweight_evaluator.py` 为 `EvaluationRunResult` 增加 `prefix_hashes`、`prefix_hash_unique_count`，评测时无论真实调用成功、异常降级还是 `safe_degrade=on` 的受控降级，都会先构造 prompt 并采集前缀 hash。
+  - 扩展 `comparison_results.csv/json` 的样本对比行、配置汇总与总体摘要，新增 `prefix_hash_count`、`unique_prefix_hash_count`、`prefix_hash_reuse_ratio`、`shared_prefix_hash_count`、`prefix_hash_jaccard_similarity` 等字段。
+  - 更新 `tests/test_lightweight_evaluator.py`，为基线/实验伪造不同的 hash 分布，覆盖复用率变化、前缀集合重叠度以及新产物字段写盘。
+  - 更新 `README.md` 与 `.trae/specs/add-prefix-context-caching/tasks.md`、`checklist.md`，同步声明轻量评测已具备 prefix hash 代理信号与可复盘结论。
+- **验证与结果**：
+  - 自动化测试：`python -m pytest tests/test_lightweight_evaluator.py tests/test_api_prefix_hash.py -q` 通过（`10 passed`）。
+  - CLI 复跑：执行 `python evaluate.py --input-dir output_files/seed_eval_input --bootstrap-from-seed --seed-dir test_prompts --baseline-config-file test_prompts/evaluate_baseline.json --experiment-config-file test_prompts/evaluate_experiment.json --safe-degrade on --output comparison_results.csv --details-json comparison_results.json` 成功生成新报告。
+  - 报告摘要：当前 seed 样本下，基线与实验各记录 `2` 次 prefix hash 命中、各有 `1` 个唯一 hash，复用率均为 `0.5`；两组配置的前缀 hash 完全不同，`shared_prefix_hash_count=0`、`prefix_hash_jaccard_similarity=0.0`，说明实验配置确实改变了稳定前缀族，但未带来质量代理与稳定性指标退化。
+- **结论**：
+  - 现有前缀缓存化改动已具备最小可复盘评测闭环：既能追踪质量代理，也能追踪 `prefix_hash` 这一缓存命中代理信号。
+  - 基于当前报告，可继续推进后续提示词工程优化，但应保持“质量代理不下降、结构/术语稳定不回退、prefix_hash 复用率与重叠度变化可解释”作为后续门槛。
+- **相关文件**：
+  - `modules/lightweight_evaluator.py`
+  - `tests/test_lightweight_evaluator.py`
+  - `comparison_results.csv`
+  - `comparison_results.json`
+  - `.trae/specs/add-prefix-context-caching/tasks.md`
+  - `.trae/specs/add-prefix-context-caching/checklist.md`
+  - `README.md`

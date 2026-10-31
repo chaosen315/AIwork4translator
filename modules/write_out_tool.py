@@ -1,8 +1,43 @@
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, List, Dict, Any
 import re
 import json
 import os
 from .log_manager import TranslationLogManager
+
+
+def _write_partial_completion_notice(
+    output_md_path: str,
+    failed_segments: List[Dict[str, Any]],
+    total_paragraphs: int,
+) -> None:
+    """在最终 Markdown 顶部写入“部分完成”摘要，便于用户立即看到失败段信息。"""
+    completed_count = max(total_paragraphs - len(failed_segments), 0)
+    failed_ids = [str(item.get('paragraph_number', '?')) for item in failed_segments]
+
+    with open(output_md_path, 'w', encoding='utf-8') as f:
+        f.write("> [!WARNING]\n")
+        f.write("> 当前翻译结果为部分完成。\n")
+        f.write(f"> 已完成段落：{completed_count}/{total_paragraphs}\n")
+        f.write(f"> 未完成段落：{', '.join(failed_ids) if failed_ids else '无'}\n\n")
+        f.write("## 未完成段落清单\n\n")
+
+        if not failed_segments:
+            f.write("- 无\n\n")
+            return
+
+        for item in failed_segments:
+            p_id = item.get('paragraph_number', '?')
+            retry_count = item.get('retry_count', '?')
+            error_summary = item.get('error_summary', '未知错误')
+            header_path = " > ".join(item.get('header_path', []) or [])
+            content_preview = item.get('content_preview', '')
+
+            f.write(f"- 段落 {p_id}：重试 {retry_count} 次后仍失败；错误：{error_summary}\n")
+            if header_path:
+                f.write(f"  标题路径：{header_path}\n")
+            if content_preview:
+                f.write(f"  上下文：{content_preview}\n")
+        f.write("\n---\n")
 
 def write_to_markdown_through_json(
     json_file_path: str,
@@ -24,11 +59,12 @@ def write_to_markdown_through_json(
 def finalize_translation_output(
     json_file_path: str,
     output_md_path: str,
-    mode: str = "structured"
+    mode: str = "structured",
+    failed_segments: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """
-    Merges the incremental logs into the blueprint JSON and generates the final Markdown file.
-    Should be called once at the end of the translation process.
+    将增量日志回放到蓝图 JSON，并统一生成最终 Markdown。
+    若存在失败段，则同时写入“部分完成”摘要，并把失败清单回写到 `_intermediate.json`。
     """
     # 1. Load Blueprint
     try:
@@ -42,22 +78,27 @@ def finalize_translation_output(
     log_manager = TranslationLogManager(json_file_path)
     updates = log_manager.replay_logs()
     
-    if not updates:
-        print("No translation logs found to merge.")
-        return
-
-    # 3. Update Blueprint in Memory
+    # 3. 在内存中更新蓝图，并将失败段状态同步回 JSON。
     text_info = data.get('text_info', [])
+    total_paragraphs = len(text_info)
+    failed_segments = failed_segments if failed_segments is not None else data.get('failed_segments', [])
+    failure_map = {
+        item.get('paragraph_number'): item
+        for item in failed_segments
+        if item.get('paragraph_number') is not None
+    }
     # Create a map for faster lookup if needed, but iterating is fine for update
     # Better: iterate over text_info and update if p_id in updates
     
     # We also need to respect the order for MD writing
     # text_info is usually sorted by paragraph_number
     
-    # Clear the file first to avoid appending to existing content?
-    # write_to_markdown uses 'a' (append). So we should clear it if we are regenerating.
-    with open(output_md_path, 'w', encoding='utf-8') as f:
-        f.write('') # Clear file
+    # 先清空或写入部分完成提示，避免与旧 Markdown 内容叠加。
+    if failed_segments:
+        _write_partial_completion_notice(output_md_path, failed_segments, total_paragraphs)
+    else:
+        with open(output_md_path, 'w', encoding='utf-8') as f:
+            f.write('')
 
     for item in text_info:
         p_id = item.get('paragraph_number')
@@ -68,9 +109,15 @@ def finalize_translation_output(
             item['notes'] = update.get('notes', '')
             item['new_terms'] = update.get('new_terms', [])
             item['matched_terms'] = update.get('matched_terms', [])
+            item['request_metadata'] = update.get('request_metadata', {})
+            item['prefix_hash'] = update.get('prefix_hash') or item.get('request_metadata', {}).get('prefix_hash', '')
             item['status'] = 'completed'
+            item.pop('failure_info', None)
+        elif p_id in failure_map:
+            item['status'] = 'failed'
+            item['failure_info'] = failure_map[p_id]
             
-        # Write to MD if completed
+        # 仅已完成段会被写入最终 Markdown；失败段只出现在顶部摘要中。
         if item.get('status') == 'completed':
             trans = item.get('translation', '')
             notes = item.get('notes', '')
@@ -85,13 +132,15 @@ def finalize_translation_output(
             write_to_markdown(output_md_path, (response, meta_data), mode)
 
     # 4. Save Updated Blueprint
+    data['failed_segments'] = failed_segments
+    data['translation_status'] = 'partial' if failed_segments else 'completed'
+    data['completed_paragraphs'] = sum(1 for item in text_info if item.get('status') == 'completed')
+    data['total_paragraphs'] = total_paragraphs
+
     with open(json_file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         
-    # 5. Cleanup Log? 
-    # Spec says: "TranslationLogManager is removed after successful finalization (or kept...)"
-    # Let's keep it for safety or manual cleanup, or rename it.
-    # For now, leaving it is safer. User can delete.
+    # 5. 合并完成后删除临时日志，避免后续恢复时误把旧日志再次回放。
     if os.path.exists(log_manager.log_path):
         try:
             os.remove(log_manager.log_path)

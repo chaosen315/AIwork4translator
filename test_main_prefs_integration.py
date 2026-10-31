@@ -15,8 +15,12 @@ class FakeLLMService:
         return "prompt"
     def call_ai_model_api(self, prompt):
         return {"translation": "ok", "new_terms": [], "notes": ""}, 1
-    async def call_ai_model_api_async(self, prompt):
-        return self.call_ai_model_api(prompt)
+    async def call_ai_model_api_async(self, prompt, prompt_metadata=None):
+        return {"translation": "ok", "new_terms": [], "notes": ""}, 1
+    async def repair_json_async(self, text):
+        return {"translation": "ok", "new_terms": [], "notes": ""}, 0
+    async def rewrite_with_glossary_async(self, translation, notes, corrections):
+        return {"translation": translation, "notes": notes}, 0
     def test_api(self):
         return {"success": True}
 
@@ -52,7 +56,7 @@ def test_main_prefs_roundtrip(monkeypatch, tmp_path):
     monkeypatch.setattr("modules.write_out_tool.write_to_markdown", _write_to_markdown)
     monkeypatch.setattr("modules.csv_process_tool.find_matching_terms", lambda p, t: {})
 
-    # provider / 文件 / 是否有词表 / 词表路径 / 是否合并 / 并发模式 / 是否导出
+    # 交互顺序：Provider → 文件路径 → 是否有词表(y) → 词表路径 → 合并新术语(y/n) → 并发(y/n) → 导出(y/n)
     inputs = iter(["kimi", str(md), "y", str(csvp), "y", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
     import main as mainmod
@@ -66,7 +70,6 @@ def test_main_prefs_roundtrip(monkeypatch, tmp_path):
     assert prefs["last_input_md_file"] == str(md)
     assert prefs["last_csv_path"] == str(csvp)
 
-    # 全部使用偏好默认值再跑一次：provider/文件/词表路径留空，其余回答 y/n/n
     inputs2 = iter(["", "", "y", "", "y", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs2))
     importlib.reload(mainmod)

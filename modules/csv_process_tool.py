@@ -1,8 +1,28 @@
 import csv, os, re, time
-from typing import Dict
+from typing import Dict, Any, List
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import nltk
+
+_COMMON_PUNCT_TRANSLATION = str.maketrans({
+    "，": ",",
+    "。": ".",
+    "：": ":",
+    "；": ";",
+    "（": "(",
+    "）": ")",
+    "【": "[",
+    "】": "]",
+    "《": "<",
+    "》": ">",
+    "“": '"',
+    "”": '"',
+    "‘": "'",
+    "’": "'",
+    "、": ",",
+    "！": "!",
+    "？": "?",
+})
 
 def get_valid_path(filepath_prompt, validate_func, default_path=None):
     while True:
@@ -77,8 +97,73 @@ def validate_csv_file(path):
         print(f"错误：读取CSV文件时出错：{e}")
         return False, original_path
 
+def _normalize_common_punctuation(text: str) -> str:
+    return text.translate(_COMMON_PUNCT_TRANSLATION)
 
-from typing import Dict, Any
+def normalize_glossary_text(text: Any) -> str:
+    raw = "" if text is None else str(text)
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = _normalize_common_punctuation(normalized)
+    normalized = normalized.replace("\t", " ")
+    lines = []
+    for line in normalized.split("\n"):
+        collapsed = re.sub(r"\s+", " ", line).strip()
+        if collapsed:
+            lines.append(collapsed)
+    return "\n".join(lines)
+
+def normalize_terms_dict(terms_dict: Dict[str, Any]) -> List[Dict[str, str]]:
+    grouped: Dict[str, set[tuple[str, str]]] = {}
+    display_terms: Dict[str, str] = {}
+
+    for raw_term, raw_value in terms_dict.items():
+        normalized_term = normalize_glossary_text(raw_term)
+        if not normalized_term:
+            continue
+
+        if isinstance(raw_value, dict):
+            normalized_translation = normalize_glossary_text(raw_value.get("translation", ""))
+            normalized_reason = normalize_glossary_text(raw_value.get("reason", ""))
+        else:
+            normalized_translation = normalize_glossary_text(raw_value)
+            normalized_reason = ""
+
+        display_terms.setdefault(normalized_term, normalized_term)
+        grouped.setdefault(normalized_term, set()).add((normalized_translation, normalized_reason))
+
+    normalized_entries: List[Dict[str, str]] = []
+    for normalized_term, candidates in grouped.items():
+        best_translation, best_reason = sorted(
+            candidates,
+            key=lambda item: (
+                item[0].casefold(),
+                item[1].casefold(),
+            ),
+        )[0]
+        normalized_entries.append(
+            {
+                "term": display_terms[normalized_term],
+                "translation": best_translation,
+                "reason": best_reason,
+            }
+        )
+
+    normalized_entries.sort(
+        key=lambda item: (
+            item["term"].casefold(),
+            item["translation"].casefold(),
+            item["reason"].casefold(),
+        )
+    )
+    return normalized_entries
+
+def serialize_terms_for_prompt(terms_dict: Dict[str, Any]) -> str:
+    normalized_entries = normalize_terms_dict(terms_dict)
+    return "\n".join(
+        f"{entry['term']} -> {entry['translation']}"
+        for entry in normalized_entries
+        if entry["term"]
+    )
 
 def load_terms_dict(csv_file_path: str) -> Dict[str, Any]:
     terms_dict = {}
@@ -104,7 +189,9 @@ def preprocess_text(text: str) -> str:
     try:
         tokens = word_tokenize(text)
     except Exception:
-        tokens = re.findall(r"[A-Za-z]+|\d+|[^\sA-Za-z\d]", text)
+        # 回退分词必须把下划线视作词内字符：否则 "the_priority_is_set" 会被拆成
+        # "the _ priority _ is _ set"，破坏 find_matching_terms 的 prev_c == '_' 边界守卫。
+        tokens = re.findall(r"[A-Za-z0-9_]+|[^\sA-Za-z0-9_]", text)
     out_tokens = []
     for token in tokens:
         lower = token.lower()

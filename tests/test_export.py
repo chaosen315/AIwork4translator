@@ -38,6 +38,26 @@ def test_export_docx(dummy_json_path, tmp_path):
     assert export_json_to_docx(dummy_json_path, output)
     assert os.path.exists(output)
 
+def test_export_docx_strips_invalid_control_chars(tmp_path):
+    data = {
+        "text_info": [
+            {
+                "paragraph_number": 1,
+                "meta_data": {"header_path": ["# Chapter 1"], "current_level": 1},
+                "content": "Hello World",
+                "translation": "第一段\f内容",
+                "notes": "备注\f信息",
+            }
+        ]
+    }
+    json_path = tmp_path / "control_chars_intermediate.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+    output = str(tmp_path / "control_chars.docx")
+    assert export_json_to_docx(str(json_path), output)
+    assert os.path.exists(output)
+
 def test_export_pdf(dummy_json_path, tmp_path):
     output = str(tmp_path / "output.pdf")
     assert export_json_to_pdf(dummy_json_path, output)

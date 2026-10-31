@@ -4,6 +4,12 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv("data/.env")
+
+# 真实调用 5 家 Provider 会消耗额度，默认只收集不执行；显式开启：set RUN_LIVE_API_TESTS=1
+pytestmark = pytest.mark.skipif(
+    os.getenv("RUN_LIVE_API_TESTS") != "1",
+    reason="real Provider API calls; set RUN_LIVE_API_TESTS=1 to enable",
+)
 # 测试用例：仿真的一句话翻译场景
 TEST_TERMS_DICT = {"night city": "夜之城"}
 TEST_ORIGINAL_TEXT = "Night City was like a deranged experiment in social Darwinism, designed by a bored researcher who kept one thumb permanently on the fast-forward button."

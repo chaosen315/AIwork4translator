@@ -1,80 +1,153 @@
-import asyncio
-import sys
-import os
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-# Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from modules.translation_core import TranslationCore, TranslationResult
+from modules.translation_core import TranslationCore, RepairPolicy
 from modules.api_tool import LLMService
 
 @pytest.mark.asyncio
-async def test_fallback():
-    # Mock LLMService（异步化重构后 TranslationCore 调用 *_async 接口）
+async def test_conservative_fallback_preserves_markdown_body():
     mock_llm = MagicMock(spec=LLMService)
-    
-    # Complex content with MD syntax, Chinese quotes, and English quotes (escaped)
-    # Scenario:
-    # 1. **Bold** and *Italic*
-    # 2. Chinese quotes: “中文”
-    # 3. Escaped English quotes: \"English\"
-    # 4. Escaped newlines: \n
-    # 5. Invalid JSON structure at the end
-    
-    # We use raw string for the content inside the JSON string value
-    # In a JSON file, it would look like: "translation": "..."
-    complex_inner_content = r'这里有 **粗体** 和 *斜体*。\n还有“中文引号”和 \"英文引号\"。\n以及代码 `code`。'
-    
-    # Construct the full "origin_text"
-    origin_text = f'{{"translation": "{complex_inner_content}", "notes": "Complex notes.", "invalid": '
-    
+
+    recovered_body = "# 标题\n\n- 列表项\n\n```python\nprint(1)\n```"
+    escaped_body = recovered_body.replace("\\", "\\\\").replace("\n", r"\n")
+    origin_text = (
+        "{'translation': '" + escaped_body + "', "
+        "'notes': '- 术语：保守恢复', "
+        "'new_terms': ["
+    )
     error_response = {
         "origin_text": origin_text,
         "error": "Invalid JSON format"
     }
-    
-    # Mock methods
+
     mock_llm.call_ai_model_api_async = AsyncMock(return_value=(error_response, 100))
     mock_llm.create_prompt.return_value = "prompt"
     mock_llm.repair_json_async = AsyncMock(return_value=(error_response, 50))
     mock_llm.rewrite_with_glossary_async = AsyncMock(return_value=({"translation": "rewritten", "new_terms": []}, 10))
 
     core = TranslationCore(mock_llm)
-    
-    segment = {"content": "Source text"}
-    terms_dict = {}
-    aggregated_new_terms = {}
-    
-    print("Starting translation step test with COMPLEX content...")
-    print(f"Origin Text Mock: {origin_text}")
-    
-    result = await core.execute_translation_step(
-        segment, 
-        terms_dict, 
-        aggregated_new_terms,
-        max_api_retries=1
-    )
-    
-    print("-" * 50)
-    print(f"Result Success: {result.success}")
-    print(f"Result Content (Raw): {result.content!r}")
-    print(f"Result Notes: {result.notes}")
-    print(f"Result Matched Terms: {result.matched_terms_delta}") # Check new field
-    print("-" * 50)
-    
-    # Expected content verification:
-    # 1. \n should become actual newline
-    # 2. \" should become "
-    expected_content = complex_inner_content.replace(r'\"', '"').replace(r'\n', '\n')
-    
-    print(f"Expected Content (Raw): {expected_content!r}")
-    
-    assert result.success, "Fallback logic did not produce a successful result"
-    assert result.content == expected_content, "Fallback content mismatch"
-    assert isinstance(result.matched_terms_delta, list), "matched_terms_delta is missing or invalid"
-    print("TEST PASSED: Fallback logic worked for complex content and structure is correct.")
 
-if __name__ == "__main__":
-    asyncio.run(test_fallback())
+    with patch("modules.translation_core.asyncio.sleep", new=AsyncMock()):
+        result = await core.execute_translation_step(
+            {"content": "Source text"},
+            {},
+            {},
+            repair_policy=RepairPolicy.NONE,
+            max_api_retries=1,
+        )
+
+    assert result.success
+    assert result.content == recovered_body
+    assert "保守解析恢复" in result.notes
+    assert "- 术语：保守恢复" in result.notes
+    assert result.new_terms_delta == []
+
+@pytest.mark.asyncio
+async def test_conservative_fallback_handles_unquoted_translation_key():
+    mock_llm = MagicMock(spec=LLMService)
+    origin_text = '{translation: "正文\\n\\n## 小节", notes: "注释未完全闭合", new_terms: [}'
+    error_response = {"origin_text": origin_text, "error": "Invalid JSON format"}
+
+    mock_llm.call_ai_model_api_async = AsyncMock(return_value=(error_response, 30))
+    mock_llm.create_prompt.return_value = "prompt"
+    mock_llm.repair_json_async = AsyncMock(return_value=(error_response, 10))
+
+    core = TranslationCore(mock_llm)
+
+    with patch("modules.translation_core.asyncio.sleep", new=AsyncMock()):
+        result = await core.execute_translation_step(
+            {"content": "Source text"},
+            {},
+            {},
+            repair_policy=RepairPolicy.NONE,
+            max_api_retries=1,
+        )
+
+    assert result.success
+    assert result.content == "正文\n\n## 小节"
+    assert "保守解析恢复" in result.notes
+
+@pytest.mark.asyncio
+async def test_targeted_fallback_uses_conservative_prompt_for_high_risk_content():
+    mock_llm = MagicMock(spec=LLMService)
+    mock_llm.provider = "gpt"
+    mock_llm.create_prompt.return_value = "base prompt"
+    mock_llm.call_ai_model_api_async = AsyncMock(return_value=(
+        {
+            "translation": "| 名称 | 值 |\n| --- | --- |\n| alpha | one |",
+            "notes": "原始注释",
+            "new_terms": [{"term": "alpha", "translation": "阿尔法", "reason": "sample"}],
+        },
+        42,
+    ))
+    mock_llm.repair_json_async = AsyncMock()
+    mock_llm.rewrite_with_glossary_async = AsyncMock()
+
+    core = TranslationCore(mock_llm)
+
+    result = await core.execute_translation_step(
+        {
+            "content": "| Name | Value |\n| --- | --- |\n| alpha | one |",
+            "meta_data": {
+                "is_protected_block": True,
+                "structure_kind": "markdown_table",
+            },
+        },
+        {},
+        {},
+        max_api_retries=1,
+    )
+
+    assert result.success
+    assert result.content.startswith("| 名称 | 值 |")
+    assert "定向 fallback" in result.notes
+    assert "原始注释" in result.notes
+    assert result.new_terms_delta == []
+    used_prompt = mock_llm.call_ai_model_api_async.await_args.args[0]
+    assert "【定向 fallback 模式】" in used_prompt
+    assert "markdown_table" in used_prompt
+    mock_llm.rewrite_with_glossary_async.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_targeted_fallback_activates_after_provider_structured_failure():
+    mock_llm = MagicMock(spec=LLMService)
+    mock_llm.provider = "kimi"
+    mock_llm.create_prompt.return_value = "base prompt"
+    error_response = {
+        "origin_text": "{'translation': '半截结果', 'new_terms': [",
+        "error": "Invalid JSON format",
+    }
+    success_response = {
+        "translation": "恢复后的译文",
+        "notes": "",
+        "new_terms": [{"term": "foo", "translation": "条目", "reason": "sample"}],
+    }
+    mock_llm.call_ai_model_api_async = AsyncMock(side_effect=[
+        (error_response, 30),
+        (success_response, 25),
+    ])
+    mock_llm.repair_json_async = AsyncMock(return_value=(error_response, 10))
+    mock_llm.rewrite_with_glossary_async = AsyncMock()
+
+    core = TranslationCore(mock_llm)
+
+    with patch("modules.translation_core.asyncio.sleep", new=AsyncMock()):
+        result = await core.execute_translation_step(
+            {"content": "Normal text", "meta_data": {}},
+            {},
+            {},
+            repair_policy=RepairPolicy.NONE,
+            max_api_retries=2,
+        )
+
+    assert result.success
+    assert result.content == "恢复后的译文"
+    assert "定向 fallback" in result.notes
+    assert result.new_terms_delta == []
+    assert mock_llm.call_ai_model_api_async.await_count == 2
+    first_prompt = mock_llm.call_ai_model_api_async.await_args_list[0].args[0]
+    second_prompt = mock_llm.call_ai_model_api_async.await_args_list[1].args[0]
+    assert "【定向 fallback 模式】" not in first_prompt
+    assert "【定向 fallback 模式】" in second_prompt
+    assert "provider失败特征" in second_prompt
+    mock_llm.rewrite_with_glossary_async.assert_not_awaited()

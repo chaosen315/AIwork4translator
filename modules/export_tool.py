@@ -38,6 +38,17 @@ def _iter_markdown_blocks(text: str):
             if p:
                 yield ("para", p)
 
+def _sanitize_docx_text(text: str) -> str:
+    if not text:
+        return ""
+    return "".join(
+        ch for ch in text
+        if ch in ("\t", "\n", "\r")
+        or 0x20 <= ord(ch) <= 0xD7FF
+        or 0xE000 <= ord(ch) <= 0xFFFD
+        or 0x10000 <= ord(ch) <= 0x10FFFF
+    )
+
 def export_json_to_xlsx(json_path: str, output_path: str) -> bool:
     try:
         data = _load_json_data(json_path)
@@ -65,19 +76,19 @@ def export_json_to_docx(json_path: str, output_path: str) -> bool:
         
         # Add Title
         base_name = os.path.splitext(os.path.basename(json_path))[0].replace('_intermediate', '')
-        doc.add_heading(base_name, 0)
+        doc.add_heading(_sanitize_docx_text(base_name), 0)
         
         for item in data:
-            content = item.get('translation', '') or ''
-            notes = item.get('notes', '')
+            content = _sanitize_docx_text(item.get('translation', '') or '')
+            notes = _sanitize_docx_text(item.get('notes', '') or '')
 
             for block in _iter_markdown_blocks(content):
                 if block[0] == "heading":
                     _, level, title = block
-                    doc.add_heading(title, level=min(int(level), 9))
+                    doc.add_heading(_sanitize_docx_text(title), level=min(int(level), 9))
                 else:
                     _, para = block
-                    doc.add_paragraph(para)
+                    doc.add_paragraph(_sanitize_docx_text(para))
             
             # Handle Notes
             if notes:
