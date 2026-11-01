@@ -18,7 +18,8 @@ AIwork4translator 是一个面向专业文档的 AI 翻译工具，适合技术�
 - **定向 fallback**：按内容风险（表格 / HTML / 代码围栏 / 容器块 / 嵌套列表）与 Provider 失败特征切换更保守的 Prompt；
 - **稳健分段**：表格、代码围栏、HTML 块、`:::` 容器与图片按受保护块整体成块，超长时按结构拆分并重复包裹行；
 - **轻量评测器**：`evaluate.py` 支持两组配置对比、`--safe-degrade off|auto|on`、`--bootstrap-from-seed` 显式建立最小基线集，报告含质量代理、结构保持、术语一致性、重复相似度与 `prefix_hash` 复用指标；
-- **WebUI 修复**：修复 WebUI 翻译链路缺少 `import json` 导致的 `NameError`，失败段现在也会写入 WARNING 摘要。
+- **WebUI 修复**：修复 WebUI 翻译链路缺少 `import json` 导致的 `NameError`，失败段现在也会写入 WARNING 摘要；
+- **术语评测（issue #44）**：3 份自造文档 × A/B/C 三组的可复现评测已落地，术语命中率 68.5% → 99.6%，详见下文「术语一致性评测」与 [eval/](./eval/)。
 
 2026/03/14 的蓝图 + 增量日志、异步 Provider 与多格式导出见 [CHANGELOG.md](./CHANGELOG.md)。
 
@@ -33,9 +34,21 @@ AIwork4translator 是一个面向专业文档的 AI 翻译工具，适合技术�
 - **📦 多格式导出**：翻译完成后基于 `_intermediate.json` 一键导出 DOCX/PDF/EPUB/XLSX；
 - **🔌 多 Provider**：Kimi / OpenAI / DeepSeek / SiliconFlow / Gemini / Doubao（当前实现）。
 
-## 关于早期数字的说明
+## 术语一致性评测（可复现）
 
-仓库描述中的「专有名词识别率 +35%」「相比传统 RAG 节省 99% token」来自早期小样本实验，仓库内目前没有可复现的评测脚本、测试集与对照数据。可复现评测已列为下一迭代任务（[issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)），结论出来后一并复核仓库描述与本文档的表述。
+在 3 份自造文档（技术文档 / 规则书 / 小说；每份约 1,200 条词表、约 2,150 词正文）上对比三种方式：不注入词表、向量 RAG（`bge-m3` top-8，按段检索后注入）、本项目（按段 Aho-Corasick 命中注入）。每份文档每组运行 2 次，18 次运行无 API 错误。
+
+| 方式 | 术语命中率 | 出现级命中率 | 额外输入 token |
+|---|---|---|---|
+| 不注入词表 | 68.5% | 43.9% | 0 |
+| 向量 RAG top-8 | 79.7% | 54.1% | +4,257（prompt +1,258 / 检索 +3,000） |
+| **本项目** | **99.6%** | **95.3%** | **+1,410** |
+
+- 术语命中率相对无词表基线 **+31.1 个百分点（相对 +45%）**，比向量 RAG 高 **19.9 个百分点**；
+- 额外 token 约为 RAG 基线的 **33%**（节省 67%），且不产生检索调用；术语密度越低节省越明显——零命中时本项目无额外开销，RAG 仍有每段检索成本；
+- 评测集、脚本与原始结果全部在 [eval/](./eval/)，可一键复现；成本曲线见 [eval/results/cost_curve.png](./eval/results/cost_curve.png)。
+
+> 口径：术语命中为子串判定；文档为合成数据、单模型（DeepSeek-V3 via SiliconFlow）；方法与局限见 [eval/README.md](./eval/README.md)。
 
 ## 快速开始
 
@@ -182,7 +195,8 @@ project_root/
 ├── services/diagnostics.py  # 异步 API 诊断与全局错误态
 ├── templates/ static/       # WebUI（FastAPI + Jinja + 原生 JS）
 ├── scripts/                 # 安装 / 导出预览 / 检查脚本
-├── tests/                   # pytest（当前基线 94 passed / 5 skipped）
+├── tests/                   # pytest（126 passed / 6 skipped；联网用例默认跳过）
+├── eval/                    # issue #44 评测集与脚本（A/B/C、成本曲线、原始结果）
 ├── reviews/                 # 历史 AI 审查报告（2025-11 ~ 2025-12）
 ├── main.py                  # CLI 入口
 ├── app.py                   # WebUI 入口
@@ -205,18 +219,18 @@ uv run python -m pytest -q    # 当前：94 passed, 5 skipped
 
 ### 下一迭代（已排期）
 
-- **可复现的术语评测**（[issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)）：3 份文档（技术文档 / 规则书 / 小说）+ 配套词表与人工标注；A 组无词表基线 vs B 组整表 RAG 注入 vs C 组本项目分段词表注入；指标 = 术语命中率（主）、额外 token 开销、耗时，每组每文档 ≥2 次取均值并保留原始计数；结论用于复核仓库描述与本文档中的早期数字。
+- **评测扩展**（[issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)）：A/B/C 评测与成本曲线已落地（见 [eval/](./eval/)）；下一步补充更长/更低密度文档、RAG top-k 敏感性（k=3/5/12）与人工误译评分。
 
 ### 后续
 
 - 稳定性：异步 RPM 限流器、非 JSON 模式的未翻译部分兜底、跨页断句信号扩展、图片回填策略化、写出上下文重构、大文档分批处理；
 - 工程：GitHub Actions + pytest CI；清理 tracked `__pycache__` / `egg-info` / 本地内部文档；
-- 文档：评测结论出来后统一修订对外数字与 README。
+- 文档：对外数字已按 [eval/](./eval/) 评测结果更新。
 
 ## 已知限制
 
 - 术语能力依赖给定的词表，**不做自动术语识别**（NER 能力已于 2025-12-27 移除）；
-- 「+35% 识别率 / 节省 99% token」为早期小样本实验结论，目前无法复现，等待评测复核；
+- 「+35% 识别率 / 节省 99% token」为早期小样本结论；现已用 [eval/](./eval/) 的可复现评测替代为具体数字（见上文「术语一致性评测」）；
 - 当前未实现 Ollama 接入；
 - 导出排版基于 Markdown 结构，复杂版式（表格、公式、图片位置）能力有限；PDF 中文字体依赖运行环境；
 - 大文件的内存占用与限流仍需优化，WebUI 建议 ≤10MB；

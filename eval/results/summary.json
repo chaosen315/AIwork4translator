@@ -1,0 +1,169 @@
+{
+  "provider": "silicon",
+  "model": "deepseek-ai/DeepSeek-V3",
+  "embedding_model": "BAAI/bge-m3",
+  "rag_top_k": 8,
+  "stub": false,
+  "docs": {
+    "novel": {
+      "A": {
+        "runs": 2,
+        "term_hit_rate": 0.6666,
+        "occurrence_hit_rate": 0.3843,
+        "prompt_tokens_est": 11421.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 15893.5,
+        "duration_seconds": 277.17,
+        "errors": 0,
+        "extra_prompt_tokens": 0.0,
+        "total_extra_tokens": 0.0
+      },
+      "B": {
+        "runs": 2,
+        "term_hit_rate": 0.8167,
+        "occurrence_hit_rate": 0.5373,
+        "prompt_tokens_est": 12584.0,
+        "embedding_tokens": 2889.0,
+        "rag_injected_entries": 96.0,
+        "provider_tokens": 14967.5,
+        "duration_seconds": 236.915,
+        "errors": 0,
+        "extra_prompt_tokens": 1163.0,
+        "total_extra_tokens": 4052.0
+      },
+      "C": {
+        "runs": 2,
+        "term_hit_rate": 1.0,
+        "occurrence_hit_rate": 0.9702,
+        "prompt_tokens_est": 12929.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 17114.0,
+        "duration_seconds": 185.835,
+        "errors": 0,
+        "extra_prompt_tokens": 1508.0,
+        "total_extra_tokens": 1508.0
+      }
+    },
+    "rulebook": {
+      "A": {
+        "runs": 2,
+        "term_hit_rate": 0.75,
+        "occurrence_hit_rate": 0.4719,
+        "prompt_tokens_est": 11464.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 15550.0,
+        "duration_seconds": 239.9,
+        "errors": 0,
+        "extra_prompt_tokens": 0.0,
+        "total_extra_tokens": 0.0
+      },
+      "B": {
+        "runs": 2,
+        "term_hit_rate": 0.8,
+        "occurrence_hit_rate": 0.5594,
+        "prompt_tokens_est": 12756.0,
+        "embedding_tokens": 3025.0,
+        "rag_injected_entries": 96.0,
+        "provider_tokens": 16556.0,
+        "duration_seconds": 370.85,
+        "errors": 0,
+        "extra_prompt_tokens": 1292.0,
+        "total_extra_tokens": 4317.0
+      },
+      "C": {
+        "runs": 2,
+        "term_hit_rate": 1.0,
+        "occurrence_hit_rate": 0.9907,
+        "prompt_tokens_est": 12883.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 13074.5,
+        "duration_seconds": 117.68,
+        "errors": 0,
+        "extra_prompt_tokens": 1419.0,
+        "total_extra_tokens": 1419.0
+      }
+    },
+    "technical_doc": {
+      "A": {
+        "runs": 2,
+        "term_hit_rate": 0.6375,
+        "occurrence_hit_rate": 0.4606,
+        "prompt_tokens_est": 11479.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 13920.5,
+        "duration_seconds": 191.875,
+        "errors": 0,
+        "extra_prompt_tokens": 0.0,
+        "total_extra_tokens": 0.0
+      },
+      "B": {
+        "runs": 2,
+        "term_hit_rate": 0.775,
+        "occurrence_hit_rate": 0.5272,
+        "prompt_tokens_est": 12797.0,
+        "embedding_tokens": 3085.0,
+        "rag_injected_entries": 96.0,
+        "provider_tokens": 14191.5,
+        "duration_seconds": 203.295,
+        "errors": 0,
+        "extra_prompt_tokens": 1318.0,
+        "total_extra_tokens": 4403.0
+      },
+      "C": {
+        "runs": 2,
+        "term_hit_rate": 0.9875,
+        "occurrence_hit_rate": 0.897,
+        "prompt_tokens_est": 12783.0,
+        "embedding_tokens": 0.0,
+        "rag_injected_entries": 0.0,
+        "provider_tokens": 18543.0,
+        "duration_seconds": 210.555,
+        "errors": 0,
+        "extra_prompt_tokens": 1304.0,
+        "total_extra_tokens": 1304.0
+      }
+    }
+  },
+  "groups": {
+    "A": {
+      "runs": 6,
+      "term_hit_rate": 0.6847,
+      "occurrence_hit_rate": 0.4389,
+      "prompt_tokens_est": 11454.6667,
+      "embedding_tokens": 0.0,
+      "provider_tokens": 15121.3333,
+      "duration_seconds": 236.315,
+      "errors": 0
+    },
+    "B": {
+      "runs": 6,
+      "term_hit_rate": 0.7972,
+      "occurrence_hit_rate": 0.5413,
+      "prompt_tokens_est": 12712.3333,
+      "embedding_tokens": 2999.6667,
+      "provider_tokens": 15238.3333,
+      "duration_seconds": 270.3533,
+      "errors": 0
+    },
+    "C": {
+      "runs": 6,
+      "term_hit_rate": 0.9958,
+      "occurrence_hit_rate": 0.9526,
+      "prompt_tokens_est": 12865.0,
+      "embedding_tokens": 0.0,
+      "provider_tokens": 16243.8333,
+      "duration_seconds": 171.3567,
+      "errors": 0
+    }
+  },
+  "rag_index_build_tokens": {
+    "technical_doc": 16222,
+    "rulebook": 14358,
+    "novel": 15825
+  }
+}

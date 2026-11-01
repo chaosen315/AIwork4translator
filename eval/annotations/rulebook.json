@@ -1,0 +1,164 @@
+{
+  "doc": "rulebook",
+  "document": "documents/rulebook.md",
+  "glossary": "glossaries/rulebook.csv",
+  "source_language": "en",
+  "target_language": "zh",
+  "matching": "case-insensitive whole phrase; generated anchors only",
+  "term_count": 30,
+  "glossary_size": 1198,
+  "document_words": 2150,
+  "total_occurrences": 160,
+  "terms": [
+    {
+      "term": "the Ashen Crown",
+      "translation": "灰烬王冠",
+      "occurrences": 5
+    },
+    {
+      "term": "Warden",
+      "translation": "守望者",
+      "occurrences": 6
+    },
+    {
+      "term": "Ember die",
+      "translation": "余烬骰",
+      "occurrences": 4
+    },
+    {
+      "term": "Sigil",
+      "translation": "符印",
+      "occurrences": 6
+    },
+    {
+      "term": "Hollow",
+      "translation": "空壳",
+      "occurrences": 5
+    },
+    {
+      "term": "the Rift",
+      "translation": "裂隙",
+      "occurrences": 7
+    },
+    {
+      "term": "Ashen Pact",
+      "translation": "灰烬契约",
+      "occurrences": 5
+    },
+    {
+      "term": "Brand",
+      "translation": "烙印",
+      "occurrences": 7
+    },
+    {
+      "term": "Vow",
+      "translation": "誓约",
+      "occurrences": 7
+    },
+    {
+      "term": "Resolve",
+      "translation": "决心",
+      "occurrences": 5
+    },
+    {
+      "term": "Scorched Mark",
+      "translation": "焦痕",
+      "occurrences": 5
+    },
+    {
+      "term": "Cinder Step",
+      "translation": "烬步",
+      "occurrences": 7
+    },
+    {
+      "term": "Emberwright",
+      "translation": "烬匠",
+      "occurrences": 6
+    },
+    {
+      "term": "the Pale Court",
+      "translation": "苍白宫廷",
+      "occurrences": 4
+    },
+    {
+      "term": "Nightglass",
+      "translation": "夜玻璃",
+      "occurrences": 5
+    },
+    {
+      "term": "Oathbreaker",
+      "translation": "背誓者",
+      "occurrences": 6
+    },
+    {
+      "term": "Hearthstone",
+      "translation": "炉石",
+      "occurrences": 6
+    },
+    {
+      "term": "Whisperwood",
+      "translation": "低语林",
+      "occurrences": 6
+    },
+    {
+      "term": "the Long Dark",
+      "translation": "长夜",
+      "occurrences": 5
+    },
+    {
+      "term": "Duskwarden",
+      "translation": "暮卫",
+      "occurrences": 5
+    },
+    {
+      "term": "Thornwake",
+      "translation": "荆棘苏醒",
+      "occurrences": 4
+    },
+    {
+      "term": "Sable Hand",
+      "translation": "黑貂之手",
+      "occurrences": 5
+    },
+    {
+      "term": "Last Lantern",
+      "translation": "最后提灯",
+      "occurrences": 6
+    },
+    {
+      "term": "Ash Tide",
+      "translation": "灰潮",
+      "occurrences": 5
+    },
+    {
+      "term": "Fading",
+      "translation": "消隐",
+      "occurrences": 6
+    },
+    {
+      "term": "Runekeeper",
+      "translation": "符文守护者",
+      "occurrences": 5
+    },
+    {
+      "term": "Wraithbound",
+      "translation": "缚灵者",
+      "occurrences": 4
+    },
+    {
+      "term": "Ember Vault",
+      "translation": "余烬宝库",
+      "occurrences": 4
+    },
+    {
+      "term": "Cinderfall",
+      "translation": "烬落",
+      "occurrences": 4
+    },
+    {
+      "term": "Dawnfire",
+      "translation": "晨火",
+      "occurrences": 5
+    }
+  ]
+}

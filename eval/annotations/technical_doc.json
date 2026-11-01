@@ -1,0 +1,214 @@
+{
+  "doc": "technical_doc",
+  "document": "documents/technical_doc.md",
+  "glossary": "glossaries/technical_doc.csv",
+  "source_language": "en",
+  "target_language": "zh",
+  "matching": "case-insensitive whole phrase; generated anchors only",
+  "term_count": 40,
+  "glossary_size": 1200,
+  "document_words": 2153,
+  "total_occurrences": 165,
+  "terms": [
+    {
+      "term": "edge node",
+      "translation": "边缘节点",
+      "occurrences": 5
+    },
+    {
+      "term": "origin shield",
+      "translation": "源站护盾",
+      "occurrences": 3
+    },
+    {
+      "term": "cache key",
+      "translation": "缓存键",
+      "occurrences": 4
+    },
+    {
+      "term": "time to live",
+      "translation": "存活时间",
+      "occurrences": 3
+    },
+    {
+      "term": "purge request",
+      "translation": "清除请求",
+      "occurrences": 3
+    },
+    {
+      "term": "stale-while-revalidate",
+      "translation": "过期再验证",
+      "occurrences": 3
+    },
+    {
+      "term": "origin server",
+      "translation": "源服务器",
+      "occurrences": 3
+    },
+    {
+      "term": "request coalescing",
+      "translation": "请求合并",
+      "occurrences": 3
+    },
+    {
+      "term": "hit ratio",
+      "translation": "命中率",
+      "occurrences": 5
+    },
+    {
+      "term": "cold start",
+      "translation": "冷启动",
+      "occurrences": 4
+    },
+    {
+      "term": "backfill",
+      "translation": "回填",
+      "occurrences": 4
+    },
+    {
+      "term": "eviction policy",
+      "translation": "淘汰策略",
+      "occurrences": 4
+    },
+    {
+      "term": "tiered cache",
+      "translation": "分层缓存",
+      "occurrences": 3
+    },
+    {
+      "term": "shield cluster",
+      "translation": "护盾集群",
+      "occurrences": 5
+    },
+    {
+      "term": "geo-steering",
+      "translation": "地理调度",
+      "occurrences": 4
+    },
+    {
+      "term": "rate limiter",
+      "translation": "限流器",
+      "occurrences": 4
+    },
+    {
+      "term": "canary release",
+      "translation": "金丝雀发布",
+      "occurrences": 3
+    },
+    {
+      "term": "failover",
+      "translation": "故障转移",
+      "occurrences": 9
+    },
+    {
+      "term": "control plane",
+      "translation": "控制面",
+      "occurrences": 3
+    },
+    {
+      "term": "data plane",
+      "translation": "数据面",
+      "occurrences": 4
+    },
+    {
+      "term": "origin fetch",
+      "translation": "源站回源",
+      "occurrences": 3
+    },
+    {
+      "term": "cache stampede",
+      "translation": "缓存击穿",
+      "occurrences": 5
+    },
+    {
+      "term": "negative caching",
+      "translation": "负缓存",
+      "occurrences": 6
+    },
+    {
+      "term": "TLS termination",
+      "translation": "TLS 终止",
+      "occurrences": 7
+    },
+    {
+      "term": "log drain",
+      "translation": "日志导出",
+      "occurrences": 5
+    },
+    {
+      "term": "health probe",
+      "translation": "健康探测",
+      "occurrences": 4
+    },
+    {
+      "term": "edge rule",
+      "translation": "边缘规则",
+      "occurrences": 5
+    },
+    {
+      "term": "maintenance window",
+      "translation": "维护窗口",
+      "occurrences": 4
+    },
+    {
+      "term": "rollback plan",
+      "translation": "回滚方案",
+      "occurrences": 3
+    },
+    {
+      "term": "capacity headroom",
+      "translation": "容量余量",
+      "occurrences": 5
+    },
+    {
+      "term": "hot partition",
+      "translation": "热分区",
+      "occurrences": 3
+    },
+    {
+      "term": "write amplification",
+      "translation": "写放大",
+      "occurrences": 3
+    },
+    {
+      "term": "regional failover",
+      "translation": "区域故障转移",
+      "occurrences": 4
+    },
+    {
+      "term": "cache tag",
+      "translation": "缓存标签",
+      "occurrences": 6
+    },
+    {
+      "term": "warm standby",
+      "translation": "热备",
+      "occurrences": 3
+    },
+    {
+      "term": "index shard",
+      "translation": "索引分片",
+      "occurrences": 4
+    },
+    {
+      "term": "throttle budget",
+      "translation": "限流预算",
+      "occurrences": 3
+    },
+    {
+      "term": "retry storm",
+      "translation": "重试风暴",
+      "occurrences": 6
+    },
+    {
+      "term": "audit trail",
+      "translation": "审计轨迹",
+      "occurrences": 3
+    },
+    {
+      "term": "capacity planner",
+      "translation": "容量规划器",
+      "occurrences": 4
+    }
+  ]
+}
