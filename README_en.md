@@ -18,7 +18,8 @@ AIwork4translator is an AI translation tool for professional documents — techn
 - **Targeted fallback**: high-risk content (tables, HTML blocks, code fences, container blocks, nested lists) and provider-specific failure patterns switch to a more conservative prompt.
 - **Robust segmentation**: tables, code fences, HTML blocks, `:::` containers and images are kept as protected blocks; oversized ones are split along structure boundaries with wrapper lines repeated.
 - **Lightweight evaluator**: `evaluate.py` compares two configurations, supports `--safe-degrade off|auto|on` and explicit `--bootstrap-from-seed`, and reports quality proxy, structure preservation, terminology consistency, repeat similarity and `prefix_hash` reuse.
-- **WebUI fix**: the WebUI translation path no longer fails with `NameError` caused by a missing `import json`; failed paragraphs now also produce the WARNING summary.
+- **WebUI fix**: the WebUI translation path no longer fails with `NameError` caused by a missing `import json`; failed paragraphs now also produce the WARNING summary;
+- **Terminology evaluation (issue #44)**: a reproducible A/B/C evaluation over three self-authored documents is available; term hit rate goes from 68.5% to 99.6% — see "Terminology Evaluation (Reproducible)" below and [eval/](./eval/).
 
 Blueprint + append-only log, async providers and multi-format export from 2026/03/14 are documented in [CHANGELOG.md](./CHANGELOG.md).
 
@@ -33,9 +34,21 @@ Blueprint + append-only log, async providers and multi-format export from 2026/0
 - **📦 Multi-format export**: one-click DOCX/PDF/EPUB/XLSX export from `_intermediate.json`.
 - **🔌 Multiple providers**: Kimi / OpenAI / DeepSeek / SiliconFlow / Gemini / Doubao (current implementations).
 
-## Note on Early-Stage Numbers
+## Terminology Evaluation (Reproducible)
 
-The repository description mentions "+35% proper-noun recognition" and "99% token savings vs traditional RAG". These numbers come from early small-sample experiments; the repository currently contains no reproducible evaluation scripts, datasets, or comparison data. A reproducible evaluation is scheduled for the next iteration ([issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)); the repository description and this document will be reconciled once the results are available.
+Three self-authored documents (technical doc / rulebook / novel; about 1,200 glossary entries and 2,150 words each) are translated with three glossary strategies: no injection, vector RAG (bge-m3 top-8, per-segment retrieval), and this project (per-segment Aho-Corasick matches). Each document runs twice per group; all 18 runs completed without API errors.
+
+| Strategy | Term hit rate | Occurrence hit rate | Extra input tokens |
+|---|---|---|---|
+| No glossary | 68.5% | 43.9% | 0 |
+| Vector RAG top-8 | 79.7% | 54.1% | +4,257 (prompt +1,258 / retrieval +3,000) |
+| **This project** | **99.6%** | **95.3%** | **+1,410** |
+
+- Term hit rate improves by **+31.1 pp (about +45% relative)** over the no-glossary baseline and is **19.9 pp higher than vector RAG**.
+- Extra tokens are about **33% of the RAG baseline** (67% less) with no retrieval calls; the lower the term density, the larger the saving — with zero matches this project adds nothing, while RAG still pays a retrieval call per segment.
+- The dataset, scripts and raw results live in [eval/](./eval/); the cost curve is [eval/results/cost_curve.png](./eval/results/cost_curve.png).
+
+> Method: substring-based term matching; synthetic documents; single model (DeepSeek-V3 via SiliconFlow). Details and limitations: [eval/README.md](./eval/README.md).
 
 ## Quick Start
 
@@ -182,7 +195,8 @@ project_root/
 ├── services/diagnostics.py  # async API diagnostics and global error state
 ├── templates/ static/       # WebUI (FastAPI + Jinja + vanilla JS)
 ├── scripts/                 # install / export preview / check scripts
-├── tests/                   # pytest (current baseline: 94 passed / 5 skipped)
+├── tests/                   # pytest (126 passed / 6 skipped; live-API cases skipped by default)
+├── eval/                    # issue #44 evaluation set and scripts (A/B/C, cost curve, raw results)
 ├── reviews/                 # historical AI review reports (2025-11 to 2025-12)
 ├── main.py                  # CLI entry point
 ├── app.py                   # WebUI entry point
@@ -205,18 +219,18 @@ uv run python -m pytest -q    # current: 94 passed, 5 skipped
 
 ### Next Iteration (Scheduled)
 
-- **Reproducible terminology evaluation** ([issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)): 3 documents (technical doc / rulebook / novel) with glossaries and manual annotations; Group A (no glossary baseline) vs Group B (full-glossary RAG-style injection) vs Group C (this project's segment-level glossary injection); metrics = term hit rate (primary), extra token overhead, elapsed time; each group runs each document at least twice with raw counts retained. The conclusions will be used to reconcile the early-stage numbers in the repository description and this document.
+- **Evaluation extensions** ([issue #44](https://github.com/chaosen315/AIwork4translator/issues/44)): the A/B/C evaluation and cost curve are now available in [eval/](./eval/); next steps are longer/lower-density documents, RAG top-k sensitivity (k=3/5/12) and human-judged mistranslation scoring.
 
 ### Later
 
 - Stability: async RPM rate limiter, fallback for untranslated content in non-JSON mode, broader mid-page break signals, strategy-based image re-insertion, write-context refactor, batched processing for very large documents;
 - Engineering: GitHub Actions + pytest CI; cleanup of tracked `__pycache__` / `egg-info` / local internal docs;
-- Documentation: unified revision of the public numbers and README once evaluation results are in.
+- Documentation: the public numbers are now based on the reproducible evaluation in [eval/](./eval/).
 
 ## Known Limitations
 
 - Terminology depends on a supplied glossary — **no automatic term recognition** (the NER capability was removed on 2025-12-27);
-- The "+35% recognition / 99% token savings" figures come from early small-sample experiments and are not currently reproducible; they await evaluation;
+- The "+35% recognition / 99% token savings" figures came from early small-sample experiments; they are now replaced by the reproducible numbers in [eval/](./eval/) (see "Terminology Evaluation" above);
 - Ollama integration is not implemented;
 - Export layout is based on Markdown structure, so complex layouts (tables, formulas, image positions) are limited; Chinese fonts for PDF depend on the runtime environment;
 - Memory usage and rate limiting for very large files still need improvement; the WebUI recommends files ≤10MB;
