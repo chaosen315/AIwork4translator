@@ -48,6 +48,8 @@ Three self-authored documents (technical doc / rulebook / novel; about 1,200 glo
 - Extra tokens are about **33% of the RAG baseline** (67% less) with no retrieval calls; the lower the term density, the larger the saving — with zero matches this project adds nothing, while RAG still pays a retrieval call per segment.
 - The dataset, scripts and raw results live in [eval/](./eval/); the cost curve is [eval/results/cost_curve.png](./eval/results/cost_curve.png).
 
+![Cost curve: extra tokens vs term density](./eval/results/cost_curve.png)
+
 > Method: substring-based term matching; synthetic documents; single model (DeepSeek-V3 via SiliconFlow). Details and limitations: [eval/README.md](./eval/README.md).
 
 ## Quick Start

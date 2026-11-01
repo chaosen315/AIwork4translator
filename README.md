@@ -48,6 +48,8 @@ AIwork4translator 是一个面向专业文档的 AI 翻译工具，适合技术�
 - 额外 token 约为 RAG 基线的 **33%**（节省 67%），且不产生检索调用；术语密度越低节省越明显——零命中时本项目无额外开销，RAG 仍有每段检索成本；
 - 评测集、脚本与原始结果全部在 [eval/](./eval/)，可一键复现；成本曲线见 [eval/results/cost_curve.png](./eval/results/cost_curve.png)。
 
+![成本曲线：额外 token vs 术语密度](./eval/results/cost_curve.png)
+
 > 口径：术语命中为子串判定；文档为合成数据、单模型（DeepSeek-V3 via SiliconFlow）；方法与局限见 [eval/README.md](./eval/README.md)。
 
 ## 快速开始
