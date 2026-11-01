@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "program-translator"
-description = "专业文档翻译工具，通过专有名词识别和正则过滤确保术语准确翻译"
+description = "词表驱动的专业文档翻译工具：Aho-Corasick 术语匹配与保护、结构化分段、并发翻译与多格式导出"
 authors = [{name = "User"}]
 requires-python = ">=3.11"
 version = "1.1.0"

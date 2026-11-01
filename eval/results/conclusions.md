@@ -47,11 +47,17 @@
 
 C 171s < A 236s < B 270s（每文档均值）。B 多出每段一次 embedding 往返；C 更快。
 
-## 5. 对仓库描述与 README 的修订建议
+## 5. 对仓库描述与 README 的修订（2026-11-01 已落地）
 
-当前描述：`Optimizes proper noun accuracy with 35% higher recognition rate and 99% token savings vs traditional RAG.`
+旧描述：`Optimizes proper noun accuracy with 35% higher recognition rate and 99% token savings vs traditional RAG.`
 
-建议改为（待维护者确认，本任务不改宣传口径）：
+已更新为：
+
+> AI translation for technical docs, novels and rulebooks. Reproducible 3-document evaluation: 99.6% terminology hit rate vs 68.5% without a glossary and 79.7% with vector RAG, at about 33% of RAG's extra token cost. CLI/WebUI; Markdown/PDF/Word/EPUB/XLSX.
+
+同步调整 topics：移除 `named-entity-recognition`，新增 `glossary` / `terminology-management` / `document-translation`。README 中英文与 CHANGELOG 亦已更新。
+
+中文表述参考：
 
 > 在可复现的三文档评测集（每份 ~1,200 条词表 / ~2,150 词正文，向量 RAG top-8 基线）上，分段词表注入把术语命中率从 68.5% 提升到 99.6%（+31.1pp，相对约 +45%），比向量 RAG 基线（79.7%）高 20pp；额外 token 开销约为向量 RAG 基线的 33%（省约 67%），且不产生检索调用。文档术语密度越低，token 节省比例越高。
 
